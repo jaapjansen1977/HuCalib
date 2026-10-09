@@ -8,7 +8,8 @@ op bewegingsanalyse.
 De opnames kunnen worden verwerkt met een afzonderlijke
 [Pose2Sim-analysemodule](docs/pose2sim_analysis.md). Deze controleert de
 sessiegegevens en voert Pose2Sim op CPU uit in een aparte Python-omgeving.
-De grafische interface richt zich momenteel op kalibratie en opname.
+De grafische interface biedt hiervoor Nederlandstalige analysebediening en
+een grafiekviewer. [Bekijk de interfacevoorbeelden](docs/analysis_interface.md).
 
 ---
 
@@ -39,6 +40,7 @@ van de volledige opstelling moet in de praktijk worden vastgesteld.
 - Projectbeheer: nieuwe projecten aanmaken of bestaande openen
 - Video-opname van de live camerabeelden, exporteerbaar naar tools zoals Pose2Sim
 - Afzonderlijke Pose2Sim-analyse met invoercontroles, staplogs en 3D-/OpenSim-resultaten
+- Nederlandstalige analysebediening met voortgang en grafieken van alle berekende modelcoördinaten
 
 ---
 

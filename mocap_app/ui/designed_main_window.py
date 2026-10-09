@@ -4183,6 +4183,9 @@ class DesignedMainWindow(FunctionalMainWindow, Ui_MainWindow):
         self.btn_camera_load_video.setToolTip(
             "Laad een videobestand om de intrinsics/extrinsics daaruit te berekenen"
         )
+        self.btn_camera_analyze = QPushButton('Bewegingsanalyse…', self.frame)
+        self.btn_camera_analyze.setToolTip('Controleer een afgeronde opname en analyseer deze met Pose2Sim')
+        self.btn_camera_analyze.clicked.connect(self._on_open_analysis)
 
         live_actions = QWidget(self.frame)
         live_actions_layout = QHBoxLayout(live_actions)
@@ -4198,6 +4201,7 @@ class DesignedMainWindow(FunctionalMainWindow, Ui_MainWindow):
         video_actions_layout.setSpacing(6)
         video_actions_layout.addWidget(self.btn_camera_record)
         video_actions_layout.addWidget(self.btn_camera_load_video)
+        video_actions_layout.addWidget(self.btn_camera_analyze)
 
         top_layout = self.frame.layout()
         if isinstance(top_layout, QGridLayout):
@@ -4422,6 +4426,11 @@ class DesignedMainWindow(FunctionalMainWindow, Ui_MainWindow):
     def _setup_ui(self) -> None:
         """Override the base setup: the designed widgets are already in place."""
         self._designed_status_bar().showMessage("Idle")
+        self.menuAnalysis = QtWidgets.QMenu('Analyse', self)
+        self.actionAnalyzeRecording = QtGui.QAction('Bewegingsanalyse…', self)
+        self.actionAnalyzeRecording.triggered.connect(self._on_open_analysis)
+        self.menuAnalysis.addAction(self.actionAnalyzeRecording)
+        self.menuBar.insertMenu(self.menuHelp.menuAction(), self.menuAnalysis)
 
     def _designed_status_bar(self):
         """Return the status bar, calling it when ``statusBar`` is a method."""

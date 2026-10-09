@@ -2,8 +2,9 @@
 
 De module leest een afgeronde HuCalib-opname en maakt een zelfstandig
 Pose2Sim-project in een **nieuwe map buiten de opname**. De opname en haar
-kalibratiekopie worden niet gewijzigd. Dit is een aanroepbare module en
-commandoregelinterface; een analyseknop in de GUI volgt in een volgende stap.
+kalibratiekopie worden niet gewijzigd. De module is bereikbaar via het
+Nederlandstalige venster **Bewegingsanalyse**, naast de Python- en
+commandoregelinterface. Zie [bediening en interfacevoorbeelden](analysis_interface.md).
 
 ## Vooraf controleren
 

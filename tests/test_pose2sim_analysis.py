@@ -142,6 +142,17 @@ class AnalysisTests(unittest.TestCase):
                 run_analysis(self.session, output, self.config, Path(sys.executable), timeout=1)
         self.assertEqual(json.loads((output / 'analysis.json').read_text())['status'], 'failed')
 
+    def test_virtual_environment_interpreter_symlink_is_preserved(self):
+        selected = self.root / 'venv-python'
+        try:
+            selected.symlink_to(sys.executable)
+        except OSError:
+            self.skipTest('This platform/account does not permit interpreter symlinks')
+        with patch('mocap_app.analysis.pose2sim.subprocess.run', return_value=subprocess.CompletedProcess([], 1)) as run:
+            with self.assertRaises(AnalysisError):
+                run_analysis(self.session, self.root / 'analysis', self.config, selected)
+        self.assertEqual(run.call_args.args[0][0], str(selected))
+
     def test_existing_output_and_session_contents_preserved(self):
         with self.assertRaises(AnalysisError):
             run_analysis(self.session, self.session / 'analysis', self.config, Path(sys.executable))

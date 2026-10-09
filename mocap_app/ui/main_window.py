@@ -135,6 +135,8 @@ class MainWindow(QMainWindow):
         self._video_recorder: VideoRecorder | None = None
         self._recording_finalize_worker: RecordingFinalizeWorker | None = None
         self._last_recording_dir: Path | None = None
+        self._last_analysis_session_dir: Path | None = None
+        self._analysis_dialog = None
         # True while the single "Start kalibratie" button drives the fully
         # automatic intrinsics -> solve -> extrinsics -> solve -> results chain.
         self._auto_calibration_active = False
@@ -2063,6 +2065,23 @@ class MainWindow(QMainWindow):
             suffix += 1
         return candidate
 
+    def _on_open_analysis(self) -> None:
+        """Open analysis controls without interrupting capture or recording."""
+        if (self._video_recorder is not None
+                or (self._live_worker is not None and self._live_worker.isRunning())
+                or (self._recording_finalize_worker is not None and self._recording_finalize_worker.isRunning())):
+            self._show_warning('Stop eerst de live weergave en wacht tot de opname is afgerond.')
+            return
+        if self._analysis_dialog is None:
+            from mocap_app.ui.analysis_dialog import AnalysisDialog
+            self._analysis_dialog = AnalysisDialog(
+                self._config.app_root / 'analysis-settings.ini',
+                self._last_analysis_session_dir,
+                self._project_results_dir(), self)
+        self._analysis_dialog.show()
+        self._analysis_dialog.raise_()
+        self._analysis_dialog.activateWindow()
+
     def _on_record_toggled(self, enabled: bool) -> None:
         """Start or stop recording the live capture to per-camera clips in a
         timestamped folder under the recordings directory."""
@@ -2196,6 +2215,9 @@ class MainWindow(QMainWindow):
         if clicked is rename_button:
             output_dir = self._rename_recording(output_dir) or output_dir
 
+        self._last_analysis_session_dir = output_dir
+        if self._analysis_dialog is not None and not self._analysis_dialog.busy:
+            self._analysis_dialog.session.setText(str(output_dir))
         self._calibration_panel.show_feedback(f"Opname bewaard in {output_dir}", success=True)
         self._set_status(f"Video opgeslagen in {output_dir}")
         self._prompt_open_recording_folder(output_dir)
@@ -3534,6 +3556,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Refuse to close while a solve runs; otherwise stop all workers,
         wait for a pending re-encode and persist the advanced settings."""
+        if self._analysis_dialog is not None and self._analysis_dialog.busy:
+            self._show_warning('Wacht tot de bewegingsanalyse of opnamecontrole is afgerond voordat je de app sluit.')
+            event.ignore()
+            return
         if self._intrinsics_solve_worker is not None and self._intrinsics_solve_worker.isRunning():
             QMessageBox.information(
                 self,

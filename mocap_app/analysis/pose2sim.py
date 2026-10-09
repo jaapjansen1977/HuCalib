@@ -194,7 +194,9 @@ def run_analysis(session: Path, output: Path, config_template: Path, python: Pat
                  assume_synchronized: bool = False, timeout: float = 1800) -> dict:
     """Create a new analysis folder. Originals are never modified."""
     session, output = session.resolve(), output.resolve()
-    python, config_template = python.resolve(), config_template.resolve()
+    # A venv interpreter is often a symlink. Resolving that symlink selects the
+    # base interpreter and loses the analysis environment's installed packages.
+    python, config_template = python.expanduser().absolute(), config_template.resolve()
     if output == session or output.is_relative_to(session) or session.is_relative_to(output):
         raise AnalysisError('Bewaar de analyse in een aparte map buiten de opname.')
     if timeout <= 0 or not math.isfinite(timeout):
@@ -308,14 +310,28 @@ def run_analysis(session: Path, output: Path, config_template: Path, python: Pat
 def main() -> int:
     parser = argparse.ArgumentParser(description='Analyseer een HuCalib-opname met een aparte Pose2Sim-omgeving.')
     parser.add_argument('--session', required=True, type=Path)
-    parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--output', type=Path)
     parser.add_argument('--config', required=True, type=Path, help='Volledig Pose2Sim Config.toml-sjabloon')
-    parser.add_argument('--python', required=True, type=Path, help='Python uit de afzonderlijke Pose2Sim-omgeving')
+    parser.add_argument('--python', type=Path, help='Python uit de afzonderlijke Pose2Sim-omgeving')
+    parser.add_argument('--check-only', action='store_true', help='Controleer opname, instellingen en analyseomgeving zonder analyse')
     parser.add_argument('--diagnostic-resolution-mismatch', action='store_true', help='Alleen diagnostiek: accepteer een resolutieverschil zonder kalibratie aan te passen')
     parser.add_argument('--assume-synchronized', action='store_true', help='Sla bewegingsgebaseerde synchronisatie over; alleen voor reeds gesynchroniseerde invoer')
     parser.add_argument('--timeout', type=float, default=1800, help='Tijdslimiet per stap in seconden')
     args = parser.parse_args()
     try:
+        if args.check_only:
+            checked = validate_session(args.session, diagnostic_resolution_mismatch=args.diagnostic_resolution_mismatch)
+            config = tomllib.loads(args.config.read_text(encoding='utf-8'))
+            for section in ('project', 'pose', 'synchronization', 'filtering', 'kinematics'):
+                if not isinstance(config.get(section), dict):
+                    raise AnalysisError(f'Configuratiesjabloon mist sectie {section}.')
+            from Pose2Sim import Pose2Sim  # Verify the chosen environment's dependencies.
+            print(json.dumps({'session_id': checked['manifest']['session_id'],
+                              'videos': checked['videos'], 'warnings': checked['warnings'],
+                              'frame_rate': checked['frame_rate']}))
+            return 0
+        if args.output is None or args.python is None:
+            parser.error('--output en --python zijn nodig om een analyse te starten')
         run_analysis(args.session, args.output, args.config, args.python,
                      diagnostic_resolution_mismatch=args.diagnostic_resolution_mismatch,
                      assume_synchronized=args.assume_synchronized, timeout=args.timeout)
