@@ -132,6 +132,12 @@ de uitgebreide trajectfile bevat 96 rijen met 65 markers. OpenSim leverde 96
 tijdstappen met 62 coördinaten. De waarden zijn eindig, het geschaalde model kan
 worden geladen en de bron-/kopiehashes komen overeen. Alle 41 unit-tests slagen.
 
+Hieronder staan de berekende heup-, knie- en enkelhoeken uit deze demo.
+Blauw is links, oranje is rechts. Dit is een functionele demonstratie;
+de meetnauwkeurigheid is niet gevalideerd.
+
+![Berekende gewrichtshoeken uit de Pose2Sim-demo](examples/pose2sim-demo-gewrichtshoeken.png)
+
 Windows-processen, de GUI, packaging, webcamdrivers, fysieke reconnect-identiteit
 en timing bij echte webcamopnames blijven afzonderlijke praktijktests. Deze stap
 voegt geen GaitDynamics, krachtenberekening of hardware-synchronisatie toe.
