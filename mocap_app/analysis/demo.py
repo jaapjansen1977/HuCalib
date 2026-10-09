@@ -50,4 +50,3 @@ def import_demo(demo: Path, calibration: Path, output: Path) -> None:
                 capture.release()
     finally:
         session.finish()
-

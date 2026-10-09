@@ -54,10 +54,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Dependencyversies vastleggen mislukt.' }
     & $buildPython tools\prepare_windows_demo.py --output (Join-Path $kit 'Demo')
     if ($LASTEXITCODE -ne 0) { throw 'Demo voorbereiden mislukt.' }
-    Get-ChildItem -Path $kit -File -Recurse | ForEach-Object {
+    $hashLines = @(Get-ChildItem -Path $kit -File -Recurse | ForEach-Object {
         $relative = $_.FullName.Substring($kit.Length + 1)
         '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $relative
-    } | Out-File (Join-Path $kit 'SHA256SUMS.txt') -Encoding utf8
+    })
+    $hashLines | Out-File (Join-Path $kit 'SHA256SUMS.txt') -Encoding utf8
     $zip = Join-Path $outputRoot ('HuCalib-testbuild-' + $revision.Substring(0, 8) + '.zip')
     if (Test-Path $zip) { throw "Archief bestaat al: $zip" }
     Compress-Archive -Path $kit -DestinationPath $zip
