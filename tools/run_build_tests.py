@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--log', type=Path, required=True)
 args = parser.parse_args()
 with args.log.open('w', encoding='utf-8') as log:
-    result = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-v'],
+    result = subprocess.run([sys.executable, '-X', 'faulthandler', '-m', 'unittest', 'discover', '-s', 'tests', '-v'],
                             stdout=log, stderr=subprocess.STDOUT)
 print(f'Unit-tests exitcode {result.returncode}; log: {args.log}')
 if result.returncode and os.environ.get('GITHUB_ACTIONS') == 'true':
@@ -17,5 +17,5 @@ if result.returncode and os.environ.get('GITHUB_ACTIONS') == 'true':
     # to download an authenticated artifact. Tests only use temporary fixtures.
     detail = args.log.read_text(encoding='utf-8', errors='replace')[-6000:]
     detail = detail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-    print('::error title=Windows unit-tests::' + detail)
+    print(f'::error title=Windows unit-tests exitcode {result.returncode}::' + detail)
 raise SystemExit(result.returncode)
