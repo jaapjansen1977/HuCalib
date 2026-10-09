@@ -2085,8 +2085,13 @@ class MainWindow(QMainWindow):
         labels = {source.source_id: (source.label or source.source_id) for source in self._active_sources}
         fps = self._runtime_tuning.capture_fps if self._runtime_tuning.capture_fps > 0 else self._calibration_panel.target_fps()
         try:
-            self._video_recorder = VideoRecorder(output_dir=output_dir, fps=fps, labels=labels)
-        except OSError as exc:
+            bundle = self._current_calibration_bundle or self._calibration_manager.last_solution()
+            calibration_payload = self._calibration_repo.to_payload(bundle) if bundle is not None else None
+            self._video_recorder = VideoRecorder(
+                output_dir=output_dir, fps=fps, labels=labels,
+                sources=self._active_sources, calibration_payload=calibration_payload,
+            )
+        except (OSError, ValueError) as exc:
             LOGGER.error("Could not start recording: %s", exc)
             self._calibration_panel.set_recording_active(False)
             self._show_error(f"Kon de opname niet starten: {exc}")
@@ -2111,7 +2116,12 @@ class MainWindow(QMainWindow):
         if self._live_worker is not None and hasattr(self._live_worker, "detach_recorder"):
             self._live_worker.detach_recorder()
         self._calibration_panel.set_recording_active(False)
-        written = recorder.close()
+        try:
+            written = recorder.close()
+        except (OSError, RuntimeError, TimeoutError) as exc:
+            LOGGER.exception("Recording could not be finalized reliably.")
+            self._show_error(f"Kon de opname niet betrouwbaar afronden: {exc}\nMap: {recorder.output_dir}")
+            return
         self._set_dropped_frames(recorder.dropped_frames())
         if not written:
             self._calibration_panel.show_feedback("Opname gestopt; geen frames opgeslagen.", success=False)
@@ -2170,7 +2180,8 @@ class MainWindow(QMainWindow):
         box.setIcon(QMessageBox.Icon.Question)
         box.setText(
             f"Opname voltooid: {total_frames} frame(s) in {len(written)} bestand(en).\n"
-            f"{files_text}\n\nMap: {output_dir}\n\nWat wil je met deze opname doen?"
+            f"{files_text}\nSessiemanifest en framelog zijn bij de video's opgeslagen.\n"
+            f"\nMap: {output_dir}\n\nWat wil je met deze opname doen?"
         )
         keep_button = box.addButton("Bewaren", QMessageBox.ButtonRole.AcceptRole)
         rename_button = box.addButton("Naam aanpassen", QMessageBox.ButtonRole.ActionRole)

@@ -110,6 +110,13 @@ wordt als een apart videobestand opgeslagen in een tijdgestempelde map binnen he
 project. Opnemen werkt alleen met live camera's, niet met ingeladen
 videobestanden.
 
+Nieuwe opnames gebruiken vaste camerabestandsnamen (`cam01`, `cam02`, …).
+De gebruikerslabels en koppeling met de kalibratie staan in `session.json`;
+`frames.jsonl` registreert de timing en bekende ontbrekende frames. Een
+beschikbare kalibratie wordt bij het starten van de opname meegekopieerd.
+Zie [Opnames en framelogging](docs/recording_sessions.md) voor de gegevensindeling,
+beperkingen en tests met Pose2Sim-voorbeeldvideo's.
+
 ### 5. Exporteer
 Kies op het tabblad **Resultaten / Export** een formaat (**TOML** of **JSON**)
 en klik op **Export** om de cameraparameters op te slaan voor gebruik in externe
