@@ -183,7 +183,11 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual([m['camera_id'] for m in report['camera_mapping']], ['cam2', 'cam10'])
         config = json.loads((output / 'effective-config.json').read_text())
         self.assertEqual(config['pose']['device'], 'cpu')
-        self.assertEqual(config['project']['project_dir'], str(output / 'project'))
+        # Windows may expand an 8.3 temporary path (RUNNER~1) to its long name.
+        # Verify the actual directory rather than its platform-specific spelling.
+        configured_project = Path(config['project']['project_dir'])
+        self.assertTrue(configured_project.is_absolute())
+        self.assertTrue(configured_project.samefile(output / 'project'))
 
     def test_result_header_mismatch_is_explicit(self):
         path = self.root / 'result.trc'

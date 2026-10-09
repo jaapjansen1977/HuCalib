@@ -63,6 +63,17 @@ try {
     if (Test-Path $zip) { throw "Archief bestaat al: $zip" }
     Compress-Archive -Path $kit -DestinationPath $zip
     Write-Host "Testkit gereed: $zip" -ForegroundColor Green
+} catch {
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        $details = $_.Exception.Message
+        if (Test-Path (Join-Path $buildRoot 'frozen-gui-smoke.json')) {
+            $details += "`n" + (Get-Content (Join-Path $buildRoot 'frozen-gui-smoke.json') -Raw)
+        }
+        if ($details.Length -gt 2500) { $details = $details.Substring(0, 2500) }
+        $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+        Write-Output "::error title=Windows-testbuild::$details"
+    }
+    throw
 } finally {
     Pop-Location
 }
