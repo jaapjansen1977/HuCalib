@@ -42,6 +42,21 @@ jobs:
           path: dist-testbuild/HuCalib-testbuild/
           if-no-files-found: error
           retention-days: 14
+      - name: Testresultaten in jobsamenvatting
+        if: always()
+        shell: pwsh
+        run: |
+          '## Windows-testresultaten' | Add-Content $env:GITHUB_STEP_SUMMARY
+          if (Test-Path '.build-testbuild/unit-tests.log') {
+            '```text' | Add-Content $env:GITHUB_STEP_SUMMARY
+            Get-Content '.build-testbuild/unit-tests.log' -Encoding utf8 -Tail 100 | Add-Content $env:GITHUB_STEP_SUMMARY
+            '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          if (Test-Path '.build-testbuild/frozen-gui-smoke.json') {
+            '```json' | Add-Content $env:GITHUB_STEP_SUMMARY
+            Get-Content '.build-testbuild/frozen-gui-smoke.json' | Add-Content $env:GITHUB_STEP_SUMMARY
+            '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
       - name: Foutlogs bewaren
         if: failure()
         uses: actions/upload-artifact@v4
