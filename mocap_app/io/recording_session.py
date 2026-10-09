@@ -59,7 +59,9 @@ class RecordingSession:
             (folder / 'calibration.json').write_bytes(calibration_bytes)
             mapping, skipped = build_motion_capture_payload(calibration, source_ids=list(self._cameras))
             toml_text = to_toml(mapping)
-            (folder / 'calibration.toml').write_text(toml_text, encoding='utf-8')
+            # Store exactly the bytes we hash. Windows text mode would convert
+            # LF to CRLF and make a freshly captured calibration fail validation.
+            (folder / 'calibration.toml').write_bytes(toml_text.encode('utf-8'))
             self.manifest['calibration'] = {
                 'profile_file': 'calibration/calibration.json',
                 'profile_sha256': hashlib.sha256(calibration_bytes).hexdigest(),

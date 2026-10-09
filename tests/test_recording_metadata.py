@@ -75,6 +75,8 @@ class RecordingMetadataTests(unittest.TestCase):
             self.assertEqual(camera['calibration_match'], 'matching_resolution')
         profile = (self.root / 'calibration/calibration.json').read_bytes()
         self.assertEqual(hashlib.sha256(profile).hexdigest(), manifest['calibration']['profile_sha256'])
+        toml_bytes = (self.root / 'calibration/calibration.toml').read_bytes()
+        self.assertEqual(hashlib.sha256(toml_bytes).hexdigest(), manifest['calibration']['toml_sha256'])
         self.assertNotEqual(json.loads(profile)['cameras']['cam0']['translation'][0], 999.)
         self.assertEqual(len(rows), 3)
         from mocap_app.io.calibration_export import build_motion_capture_payload

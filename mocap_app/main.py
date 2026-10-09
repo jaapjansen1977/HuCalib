@@ -47,6 +47,9 @@ def run() -> int:
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
+    from mocap_app.core.testbuild import is_test_build
+    if is_test_build():
+        config.app_name += ' — Windows-testbuild'
     window = DesignedMainWindow(config=config)
     window.showMaximized()
 

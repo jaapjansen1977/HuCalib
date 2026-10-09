@@ -42,6 +42,9 @@ van de volledige opstelling moet in de praktijk worden vastgesteld.
 - Afzonderlijke Pose2Sim-analyse met invoercontroles, staplogs en 3D-/OpenSim-resultaten
 - Nederlandstalige analysebediening met voortgang en grafieken van alle berekende modelcoördinaten
 
+Voor een draagbare Windows-testversie met de officiële demo:
+[Windows-testbuild en testinstructies](docs/windows_testbuild.md).
+
 ---
 
 ## Installatie
