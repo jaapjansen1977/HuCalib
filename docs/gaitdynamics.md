@@ -16,6 +16,16 @@ De Windows-app biedt nu een begeleide WSL2-installatie en start de
 krachtberekening vanuit het venster. De daadwerkelijke rekenmodule blijft
 binnen WSL2 draaien; je hoeft daarvoor geen Linux-opdrachten in te voeren.
 
+## Afzonderlijke inverse-dynamicaproef
+
+De bestaande voorbeeldresultaten zijn ook gebruikt voor een
+[reproduceerbare inverse-dynamicaproef](examples/inverse-dynamica/README.md).
+Daar staan de invoerbestanden, netto coördinaatmomenten, restbelastingen,
+filtergevoeligheid, OpenSim-instellingen en het uitvoerbare script bij elkaar.
+De proef is technisch gecontroleerd maar heeft grote restbelastingen en twee
+niet-fysische teeninertieën. De uitkomsten zijn diagnostisch en niet klinisch
+gevalideerd. Deze berekening is een afzonderlijk onderzoek en zit niet in de app.
+
 ## Installeren en gebruiken op Windows
 
 1. Pak de **nieuwe** Windows-testbuild uit in een korte lokale map, bijvoorbeeld
@@ -151,8 +161,10 @@ maximaal 50 mm bedragen. Over **alle** frames wordt vervolgens gecontroleerd:
 Dit zijn technische afwijzingsgrenzen, geen klinische nauwkeurigheidsnormen.
 Armen, hoofd en wervels bewegen in het nieuwe model niet meer afzonderlijk.
 De lumbar-hoeken beschrijven een equivalente rompstand, geen afzonderlijke
-wervelhoeken. Spieren worden verwijderd; dit model is niet bedoeld voor
-spierkrachten, kniebelastingen of gewrichtsmomenten. Het is een geometrische
+wervelhoeken. Spieren worden verwijderd; dit model is niet gevalideerd voor
+spierkrachten, kniebelastingen of gewrichtsmomenten. Zonder spieren kan wel
+een diagnostische inverse-dynamicaberekening worden uitgevoerd; zie de
+[afzonderlijke proef](examples/inverse-dynamica/README.md) en de daar vastgelegde beperkingen. Het is een geometrische
 vereenvoudiging van de bestaande IK-uitkomst, geen nieuwe marker-IK-analyse.
 Alleen het Pose2Sim-model met gesegmenteerde rug wordt nu geconverteerd.
 
