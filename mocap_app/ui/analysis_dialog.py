@@ -261,7 +261,9 @@ class AnalysisDialog(QDialog):
 
     @property
     def busy(self):
-        return self.process.state() != QProcess.ProcessState.NotRunning or self.phase in ('checking', 'running')
+        gait = getattr(self, '_gaitdynamics_dialog', None)
+        converting = gait is not None and gait.process.state() != QProcess.ProcessState.NotRunning
+        return self.process.state() != QProcess.ProcessState.NotRunning or self.phase in ('checking', 'running') or converting
 
     def _path_row(self, form, label, value, kind):
         row = QHBoxLayout()
@@ -455,7 +457,7 @@ class AnalysisDialog(QDialog):
             self.messages.appendPlainText('Grafiek kan niet worden geopend: ' + str(error))
 
     def _open_gaitdynamics(self):
-        if not self.report or self.report.get('status') != 'completed' or self.output_dir is None:
+        if self.busy or not self.report or self.report.get('status') != 'completed' or self.output_dir is None:
             return
         from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
         motions = [entry['path'] for entry in self.report.get('result_summary', []) if 'coordinates' in entry]

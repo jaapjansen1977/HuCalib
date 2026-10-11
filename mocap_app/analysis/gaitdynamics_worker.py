@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import sys
 
-from mocap_app.analysis.gaitdynamics import COORDINATES, read_motion, verify_runtime
+from mocap_app.analysis.gaitdynamics import COORDINATES, prepare_inference_motion, read_motion, verify_runtime
 
 
 def validate_kinematics(namespace, skeleton, motion, reference=None):
@@ -121,6 +121,10 @@ def main():
     reference = output / 'inputs/kinematics-reference.json'
     kinematics_check = validate_kinematics(namespace, skeleton, output / 'inputs/motion.mot',
                                          reference if reference.is_file() else None)
+    inference_motion = output / 'inputs/inference/motion.mot'
+    preprocessing = prepare_inference_motion(output / 'inputs/motion.mot', inference_motion)
+    inference_kinematics_check = validate_kinematics(namespace, skeleton, inference_motion)
+    opt.file_paths = [str(inference_motion)]
     (output / 'kinematics-check.json').write_text(json.dumps(kinematics_check, indent=2), encoding='utf-8')
     namespace['opt'] = opt
     os.chdir(output / 'inputs')
@@ -141,6 +145,8 @@ def main():
         'upstream_original_column_header': original_columns,
         'visual_meshes_removed_for_numerical_inference': True,
         'kinematics_check': kinematics_check,
+        'inference_kinematics_check': inference_kinematics_check,
+        'preprocessing': preprocessing,
     }, indent=2), encoding='utf-8')
 
 

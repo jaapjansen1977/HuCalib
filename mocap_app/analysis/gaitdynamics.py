@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -111,6 +112,55 @@ def verify_runtime(runtime: Path) -> None:
             raise GaitDynamicsError(f'Officieel runtimebestand ontbreekt of heeft een onjuiste checksum: {name}')
 
 
+def prepare_inference_motion(source: Path, target: Path) -> dict:
+    """Explicit actual-time interpolation to the refinement model's 100 Hz grid.
+
+    Upstream rounds the source FPS to an integer before resampling. In
+    particular 59.94 Hz would silently drift. Keep the source file untouched,
+    interpolate from its real timestamps, and give upstream exactly 100 Hz.
+    """
+    names, rows, header = read_motion(source)
+    if header.get('inDegrees') not in ('yes', 'no'):
+        raise GaitDynamicsError('Onbekende hoekeenheid voor tijdinterpolatie.')
+    times = [row[0] for row in rows]
+    if any(b <= a for a, b in zip(times, times[1:])):
+        raise GaitDynamicsError('Tijdstappen moeten oplopend zijn.')
+    values = [[row[names.index(name)] for name in COORDINATES] for row in rows]
+    period = 360 if header['inDegrees'] == 'yes' else 2 * math.pi
+    for column, name in enumerate(COORDINATES):
+        if name in COORDINATES[3:6]:
+            continue
+        raw_previous, previous = values[0][column], values[0][column]
+        for row in values[1:]:
+            raw = row[column]
+            row[column] = previous + (raw - raw_previous + period / 2) % period - period / 2
+            raw_previous, previous = raw, row[column]
+    count = math.floor((times[-1] - times[0]) * 100 + 1e-8) + 1
+    if count < 152:
+        raise GaitDynamicsError('Te weinig 100 Hz-tijdstappen voor GaitDynamics.')
+    output = []
+    for i in range(count):
+        time = times[0] + i / 100
+        index = min(max(bisect.bisect_right(times, time) - 1, 0), len(times) - 2)
+        fraction = (time - times[index]) / (times[index + 1] - times[index])
+        if fraction < -1e-8 or fraction > 1 + 1e-8:
+            raise GaitDynamicsError('Tijdinterpolatie zou buiten de opname extrapoleren.')
+        fraction = min(max(fraction, 0.), 1.)
+        output.append([time] + [a + fraction * (b - a) for a, b in zip(values[index], values[index + 1])])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open('x', encoding='utf-8') as stream:
+        stream.write(f'HU3D explicit 100 Hz inference input\nnRows={count}\nnColumns=24\ninDegrees={header["inDegrees"]}\nendheader\n')
+        stream.write('\t'.join(('time', *COORDINATES)) + '\n')
+        stream.write('\n'.join('\t'.join(format(value, '.17g') for value in row) for row in output) + '\n')
+    return {'method': 'linear interpolation of continuous coordinates using actual source times',
+        'source_frames': len(rows), 'output_frames': count, 'target_sampling_rate_hz': 100,
+        'source_time_range_s': [times[0], times[-1]], 'output_time_range_s': [output[0][0], output[-1][0]],
+        'source_sampling_rate_hz': (len(rows) - 1) / (times[-1] - times[0]),
+        'source_sha256': sha256(source), 'inference_sha256': sha256(target),
+        'extrapolation': False, 'generated_missing_frames': False,
+        'angular_wraps_removed_before_interpolation': True}
+
+
 def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python: Path,
                  height_m: float, mass_kg: float, treadmill_speed: float, timeout=1800) -> dict:
     motion, model, output, runtime = [path.expanduser().absolute() for path in (motion, model, output, runtime)]
@@ -132,6 +182,7 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
               'created_at_utc': datetime.now(timezone.utc).isoformat(),
               'scientific_accuracy_validated': False, 'generated_missing_kinematics': False,
               'warnings': ['Dit zijn modelvoorspellingen, geen gemeten krachten.',
+                           'De rekeninvoer wordt op de werkelijke tijdstippen geïnterpoleerd naar 100 Hz; dit zijn geen extra opgenomen frames.',
                            'Vrije momenten zijn niet voorspeld; de upstream torque-kolommen bevatten nullen.']}
     report_path = output / 'gaitdynamics.json'
     def save():
@@ -168,6 +219,12 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
             raise GaitDynamicsError('GaitDynamics is mislukt; zie gaitdynamics.log.')
         result = inputs / 'motion_grf_pred___.mot'
         names, rows, _ = read_motion(result)
+        environment_report = json.loads((output / 'environment.json').read_text(encoding='utf-8'))
+        preprocessing = environment_report['preprocessing']
+        if len(rows) != preprocessing['output_frames'] or any(
+                abs(row[0] - round(preprocessing['output_time_range_s'][0] + i / 100, 5)) > 1e-8
+                for i, row in enumerate(rows)):
+            raise GaitDynamicsError('GaitDynamics-uitvoertijden komen niet overeen met de gecontroleerde 100 Hz-rekeninvoer.')
         expected = ['time'] + [f'{prefix}{side}_{axis}' for side in (1, 2)
             for prefix, axes in (('force', ('vx', 'vy', 'vz', 'px', 'py', 'pz')), ('torque', ('x', 'y', 'z')))
             for axis in axes]
@@ -176,8 +233,9 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
         target = output / 'ground_reaction_forces.mot'
         shutil.copy2(result, target)
         report.update(status='completed', result={'path': target.name, 'sha256': sha256(target),
-            'rows': len(rows), 'force_unit': 'N', 'cop_unit': 'm', 'right_foot': 'force1', 'left_foot': 'force2'})
-        report['environment'] = json.loads((output / 'environment.json').read_text(encoding='utf-8'))
+            'rows': len(rows), 'sampling_rate_hz': 100, 'time_range_s': [rows[0][0], rows[-1][0]],
+            'force_unit': 'N', 'cop_unit': 'm', 'right_foot': 'force1', 'left_foot': 'force2'})
+        report['environment'] = environment_report
     except Exception as error:
         report.update(status='failed', error=f'{type(error).__name__}: {error}')
         raise

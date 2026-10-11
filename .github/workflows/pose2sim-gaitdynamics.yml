@@ -35,12 +35,14 @@ jobs:
           .venv-gait/bin/python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
           .venv-gait/bin/python -m pip install -r requirements-gaitdynamics.txt
       - name: Geometrische conversie- en afwijzingsproeven
+        shell: bash
         run: .venv-pose/bin/python -m unittest discover -s tests -p test_model_conversion_integration.py -v 2>&1 | tee conversion-tests.log
       - name: Officiële video's en GaitDynamics-modellen
         run: |
           .venv-pose/bin/python tools/prepare_windows_demo.py --output Demo
           .venv-gait/bin/python tools/setup_gaitdynamics.py --output gait-runtime
       - name: Volledige bewegingsanalyse en krachtvoorspelling
+        shell: bash
         run: .venv-pose/bin/python tools/smoke_pose2sim_gaitdynamics.py --demo Demo --output model-validation --runtime gait-runtime --gait-python .venv-gait/bin/python 2>&1 | tee model-pipeline.log
       - name: Resultaat of laatste fout publiceren
         if: always()

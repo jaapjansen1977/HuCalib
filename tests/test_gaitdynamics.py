@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from mocap_app.analysis.gaitdynamics import (COORDINATES, GaitDynamicsError,
-    inspect_inputs, read_motion, run_analysis, verify_runtime)
+    inspect_inputs, prepare_inference_motion, read_motion, run_analysis, verify_runtime)
 
 
 class GaitDynamicsTests(unittest.TestCase):
@@ -73,6 +73,44 @@ class GaitDynamicsTests(unittest.TestCase):
     def test_anthropometrics_must_be_finite_and_explicit(self):
         with self.assertRaises(GaitDynamicsError):
             run_analysis(self.motion, self.model, self.root / 'output', self.root, Path('python'), 1.75, float('nan'), 0)
+
+    def test_noninteger_camera_rate_uses_real_time_without_extrapolation_or_clock_drift(self):
+        self.write_motion(rows=600)
+        names, rows, _ = read_motion(self.motion)
+        for i, row in enumerate(rows):
+            row[0] = 2.25 + i / 59.94
+            row[names.index('pelvis_tx')] = 3 * row[0]  # Known constant physical velocity.
+        self.motion.write_text('nRows=600\nnColumns=24\ninDegrees=yes\nendheader\n' +
+            '\t'.join(names) + '\n' + '\n'.join('\t'.join(str(v) for v in row) for row in rows))
+        original = self.motion.read_bytes()
+        target = self.root / 'inference.mot'
+        report = prepare_inference_motion(self.motion, target)
+        self.assertAlmostEqual(report['source_sampling_rate_hz'], 59.94)
+        output_names, result, _ = read_motion(target)
+        self.assertEqual(result[0][0], 2.25)
+        self.assertLessEqual(result[-1][0], rows[-1][0])
+        self.assertLess(rows[-1][0] - result[-1][0], .01)
+        for row in result:
+            self.assertAlmostEqual(row[output_names.index('pelvis_tx')], 3 * row[0], places=10)
+        self.assertEqual(self.motion.read_bytes(), original)
+        self.assertFalse(report['generated_missing_frames'])
+        with self.assertRaises(FileExistsError):
+            prepare_inference_motion(self.motion, target)
+
+    def test_angular_wrap_does_not_create_a_spurious_half_turn_during_interpolation(self):
+        self.write_motion(rows=160)
+        text = self.motion.read_text().splitlines()
+        start = text.index('endheader') + 2
+        for i in range(160):
+            row = text[start+i].split()
+            angle = 179 if i <= 50 else -179
+            row[1] = str(angle)
+            text[start+i] = '\t'.join(row)
+        self.motion.write_text('\n'.join(text))
+        prepare_inference_motion(self.motion, self.root / 'unwrapped.mot')
+        _, result, _ = read_motion(self.root / 'unwrapped.mot')
+        self.assertEqual(result[50][1], 179)
+        self.assertAlmostEqual(result[51][1], 181)
 
 
 if __name__ == '__main__':

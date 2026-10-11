@@ -28,7 +28,7 @@ def main():
     gait = gait_analysis(root / 'conversion/motion.mot', root / 'conversion/model.osim',
         root / 'gaitdynamics', args.runtime, args.gait_python,
         height_m=1.75, mass_kg=conversion['validation']['mass_kg'], treadmill_speed=0)
-    if gait['result']['rows'] != conversion['rows'] or not gait['environment']['kinematics_check']['conversion_reference_checked']:
+    if gait['environment']['kinematics_check']['checked_frames'] != conversion['rows'] or not gait['environment']['kinematics_check']['conversion_reference_checked']:
         raise RuntimeError('Conversie of uitvoer heeft niet alle frames onafhankelijk gecontroleerd.')
     validation = {'status': 'completed', 'pose2sim_video_inputs_tested': True,
         'pose2sim_input_cameras': len(report['inputs']),
@@ -36,6 +36,7 @@ def main():
         'converted_coordinates': len(conversion['target_independent_coordinates']),
         'frames': conversion['rows'], 'conversion': conversion['validation'],
         'gait_kinematics': gait['environment']['kinematics_check'], 'gait_result': gait['result'],
+        'gait_time_interpolation': gait['environment']['preprocessing'],
         'device': gait['environment']['device'], 'height_m': 1.75,
         'height_is_demo_assumption': True, 'mass_from_pose2sim_scaled_model_kg': conversion['validation']['mass_kg'],
         'calibration_resolution_mismatch_diagnostic': True,
