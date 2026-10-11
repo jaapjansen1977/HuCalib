@@ -4,6 +4,7 @@ import math
 import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from mocap_app.analysis.gaitdynamics import COORDINATES, GaitDynamicsError, read_motion, sha256
@@ -101,6 +102,38 @@ class ModelConversionIntegrationTests(unittest.TestCase):
                 self.write_motion(**options)
                 with self.assertRaises(GaitDynamicsError):
                     convert_model(self.motion, self.source_model, self.root / case)
+
+    @unittest.skipUnless(importlib.util.find_spec('PySide6'), 'Vereist Qt voor de echte interfaceproef')
+    def test_interface_runs_conversion_in_separate_process_and_loads_new_inputs(self):
+        import sys
+        from PySide6.QtCore import QProcess, QTimer
+        from PySide6.QtWidgets import QApplication
+        from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
+        app = QApplication.instance() or QApplication([])
+        dialog = GaitDynamicsDialog(self.motion, self.source_model, python=Path(sys.executable))
+        self.addCleanup(dialog.deleteLater)
+        heartbeat = []
+        timer = QTimer(); timer.setInterval(10); timer.timeout.connect(lambda: heartbeat.append(1)); timer.start()
+        dialog.show()
+        output = self.root / 'interface-conversion'
+        dialog._start_conversion(output)
+        deadline = time.monotonic() + 30
+        while dialog.process.state() != QProcess.ProcessState.NotRunning and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(.005)
+        timer.stop()
+        if dialog.process.state() != QProcess.ProcessState.NotRunning:
+            dialog.process.kill(); dialog.process.waitForFinished(5000)
+            self.fail('Modelconversie liep vast.')
+        app.processEvents()
+        self.assertIsNotNone(dialog.report, dialog.details.toPlainText())
+        self.assertTrue(dialog.report['compatible'], dialog.details.toPlainText())
+        self.assertEqual(dialog.motion.text(), str(output / 'motion.mot'))
+        self.assertEqual(dialog.model.text(), str(output / 'model.osim'))
+        self.assertIn('Modelconversie gereed', dialog.details.toPlainText())
+        self.assertGreater(len(heartbeat), 5, 'De interface bleef onvoldoende responsief.')
+        self.assertTrue((output / 'conversion.log').is_file())
+        dialog.close()
 
 
 if __name__ == '__main__':

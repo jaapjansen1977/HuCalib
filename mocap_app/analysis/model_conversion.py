@@ -7,7 +7,6 @@ trunk. Every input frame is checked with forward kinematics before acceptance.
 from __future__ import annotations
 
 import argparse
-import copy
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -132,6 +131,41 @@ def convert_model(motion: Path, model_path: Path, output: Path) -> dict:
     parent_point = pelvis_r.T @ (pivot - pelvis_p)
     child_point = torso_r.T @ (pivot - torso_p)
     child_rotation = torso_r.T @ pelvis_r
+    source_lookup = {name: i for i, name in enumerate(names)}
+    angular = {name: coordinates.get(name).getMotionType() == opensim.Coordinate.Rotational
+               for name in source_coordinates}
+    # A segmented spine has no exact single anatomical pivot. Register a fixed
+    # effective pivot from alternate frames while keeping its neutral pose and
+    # all rotations exact. Remaining frames independently check the reduction.
+    # Bound the registration so a poor fit cannot invent a remote pivot.
+    source_values, relative_rotations, relative_positions = [], [], []
+    for row in rows:
+        values = {name: row[source_lookup[name]] * (np.pi / 180 if angular[name] and header['inDegrees'] == 'yes' else 1)
+                  for name in source_coordinates if name in source_lookup}
+        source_values.append(values)
+        _set_state(source, state, values)
+        pr, pp = _transform(body_set.get('pelvis'), state, np)
+        tr, tp = _transform(body_set.get('torso'), state, np)
+        relative_rotations.append(pr.T @ tr)
+        relative_positions.append(pr.T @ (tp - pp))
+    neutral_relative = pelvis_r.T @ torso_r
+    neutral_position = pelvis_r.T @ (torso_p - pelvis_p)
+    design = np.concatenate([neutral_relative - r for r in relative_rotations[::2]])
+    residual = np.concatenate([p - (parent_point - r @ child_point)
+                               for p, r in zip(relative_positions[::2], relative_rotations[::2])])
+    # Small regularization chooses the anatomical pivot when rotations do not
+    # identify a unique point, e.g. a constant trunk pose or planar movement.
+    regularization = np.sqrt(len(rows) / 2) * .02
+    delta, _, _, _ = np.linalg.lstsq(np.vstack((design, regularization * np.eye(3))),
+                                    np.concatenate((residual, np.zeros(3))), rcond=None)
+    max_pivot_shift = .05
+    if np.linalg.norm(delta) > max_pivot_shift:
+        delta *= max_pivot_shift / np.linalg.norm(delta)
+    initial_errors = [float(np.linalg.norm(p - (parent_point - r @ child_point)))
+                      for p, r in zip(relative_positions, relative_rotations)]
+    child_point += delta
+    parent_point = neutral_position + neutral_relative @ child_point
+    _set_state(source, state, neutral)
 
     # Merge discarded upper-body mass properties at the neutral pose. Moving
     # arms/head are NOT dynamically equivalent to this single rigid trunk.
@@ -218,9 +252,16 @@ def convert_model(motion: Path, model_path: Path, output: Path) -> dict:
         'target_independent_coordinates': list(COORDINATES), 'units': {'angles': 'degrees', 'translations': 'm', 'time': 's'},
         'limits': {'trunk_position_m': MAX_TRUNK_POSITION_ERROR_M, 'lower_body_position_m': MAX_LOWER_POSITION_ERROR_M,
                    'orientation_rad': MAX_ORIENTATION_ERROR_RAD},
+        'pivot_registration': {'fit_frames': list(range(0, len(rows), 2)),
+            'held_out_frames': list(range(1, len(rows), 2)),
+            'neutral_pose_preserved': True, 'pivot_shift_m': float(np.linalg.norm(delta)),
+            'max_allowed_pivot_shift_m': max_pivot_shift,
+            'anatomical_pivot_max_trunk_position_error_m': max(initial_errors),
+            'parent_point_m': parent_point.tolist(), 'child_point_m': child_point.tolist()},
         'warnings': ['Experimentele kinematische vereenvoudiging, geen klinisch gevalideerde conversie.',
                      'Rugsegmenten, hoofd en armen worden één starre romp; afzonderlijke bewegingen gaan verloren.',
                      'Romp-massa, massamiddelpunt en traagheid zijn samengevoegd in de neutrale houding.',
+                     'Het vaste rompdraaipunt is op de beweging afgestemd; lumbar-hoeken zijn equivalente rompstanden, geen afzonderlijke wervelhoeken.',
                      'Dit model heeft geen spieren en is niet geschikt voor het berekenen van gewrichtsmomenten.']}
     report_file = output / 'conversion.json'
     try:
@@ -234,14 +275,9 @@ def convert_model(motion: Path, model_path: Path, output: Path) -> dict:
             raise GaitDynamicsError('Lichaamsmassa is niet behouden in de conversie.')
         # Normalize through OpenSim for parsers using the current model format.
         target.printToXML(str(target_path))
-        source_lookup = {name: i for i, name in enumerate(names)}
-        angular = {name: coordinates.get(name).getMotionType() == opensim.Coordinate.Rotational
-                   for name in source_coordinates}
         target_rows, positions, orientations, trunk_errors = [], [], [], []
         lower_errors, orientation_errors = [], []
-        for row in rows:
-            values = {name: row[source_lookup[name]] * (np.pi / 180 if angular[name] and header['inDegrees'] == 'yes' else 1)
-                      for name in source_coordinates if name in source_lookup}
+        for row, values in zip(rows, source_values):
             _set_state(source, state, values)
             sr, sp = _transform(body_set.get('pelvis'), state, np)
             tr, tp = _transform(body_set.get('torso'), state, np)

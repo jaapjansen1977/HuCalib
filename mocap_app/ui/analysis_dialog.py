@@ -465,7 +465,8 @@ class AnalysisDialog(QDialog):
                 return None  # Let the user choose when there are multiple models/trials.
             path = (self.output_dir / paths[0]).resolve()
             return path if path.is_relative_to(self.output_dir.resolve()) else None
-        self._gaitdynamics_dialog = GaitDynamicsDialog(candidate(motions), candidate(models), self)
+        self._gaitdynamics_dialog = GaitDynamicsDialog(candidate(motions), candidate(models), self,
+                                                     python=Path(self.python.text()) if self.python.text().strip() else None)
         self._gaitdynamics_dialog.show()
 
     def closeEvent(self, event):
