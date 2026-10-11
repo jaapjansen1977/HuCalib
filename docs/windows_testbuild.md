@@ -47,7 +47,10 @@ SHA256SUMS.txt
 
 Voor GaitDynamics kies je **Analyse → GaitDynamics installeren…**. Je hoeft
 geen Linux-opdrachten te typen. Klik na een eventuele Windows-herstart opnieuw
-op **Installeren / doorgaan**. De werking op een echte Windows-computer met
+op **Installeren / doorgaan**. Is Ubuntu 24.04 niet beschikbaar? Sluit lopende
+Docker- en WSL-taken en kies **WSL bijwerken**. Volg de melding in de app;
+eventueel opent Microsoft Store voor een WSL-update. Kies daarna opnieuw
+**Installeren / doorgaan**. De werking op een echte Windows-computer met
 WSL2 moet nog worden getest; de automatische GUI- en CPU-tests vervangen die
 installatieproef niet. Zie [de instructies](gaitdynamics.md).
 

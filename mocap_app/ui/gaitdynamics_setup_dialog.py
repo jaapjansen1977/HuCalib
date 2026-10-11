@@ -3,7 +3,7 @@ from pathlib import Path
 import traceback
 
 from PySide6.QtCore import QThread, Signal, QSize
-from PySide6.QtWidgets import QDialog, QLabel, QPlainTextEdit, QPushButton, QHBoxLayout, QVBoxLayout, QScrollArea, QWidget
+from PySide6.QtWidgets import QDialog, QLabel, QPlainTextEdit, QPushButton, QGridLayout, QVBoxLayout, QScrollArea, QWidget
 
 from mocap_app.analysis.gaitdynamics_wsl import WslBackend
 from mocap_app.ui.window_geometry import fit_window_to_screen
@@ -60,7 +60,8 @@ class GaitDynamicsSetupDialog(QDialog):
             'De app installeert Ubuntu 24.04, een afzonderlijke CPU-rekenomgeving en gecontroleerde AI-modellen. '
             'Je hebt internet, Windows 10/11 x64 met virtualisatie en voldoende schijfruimte nodig (reserveer 10 GB). '
             'Windows kan om beheerderstoestemming en een herstart vragen. Er wordt niet automatisch herstart. '
-            'Een aanwezige Ubuntu 24.04 wordt gebruikt; daarin worden systeempakketten toegevoegd.')
+            'Een aanwezige Ubuntu 24.04 wordt gebruikt; daarin worden systeempakketten toegevoegd. '
+            'Sluit lopende Docker- en WSL-taken voordat je WSL bijwerken kiest.')
         note.setWordWrap(True)
         layout.addWidget(note)
         self.summary = QLabel('Klik op Controleren om te zien wat al aanwezig is.')
@@ -70,15 +71,18 @@ class GaitDynamicsSetupDialog(QDialog):
         self.details.setMinimumHeight(100)
         self.details.setReadOnly(True)
         layout.addWidget(self.details, 1)
-        row = QHBoxLayout()
+        row = QGridLayout()
         self.check = QPushButton('Controleren')
         self.install = QPushButton('Installeren / doorgaan')
+        self.update_button = QPushButton('WSL bijwerken')
+        self.update_button.setToolTip('Werk Microsoft WSL bij. Sluit vooraf lopende Docker- en WSL-taken.')
         self.close_button = QPushButton('Sluiten')
-        for button in (self.check, self.install, self.close_button):
-            row.addWidget(button)
+        for index, button in enumerate((self.check, self.install, self.update_button, self.close_button)):
+            row.addWidget(button, index // 2, index % 2)
         outer.addLayout(row)
         self.check.clicked.connect(lambda: self.start('probe'))
         self.install.clicked.connect(lambda: self.start('install'))
+        self.update_button.clicked.connect(lambda: self.start('update'))
         self.close_button.clicked.connect(self.close)
         fit_window_to_screen(self, QSize(760, 560))
 
@@ -93,7 +97,7 @@ class GaitDynamicsSetupDialog(QDialog):
         self.task.progress.connect(self.details.appendPlainText)
         self.task.result.connect(self._result)
         self.task.finished.connect(self._finished)
-        for button in (self.check, self.install, self.close_button):
+        for button in (self.check, self.install, self.update_button, self.close_button):
             button.setEnabled(False)
         self.summary.setText('Controleren…' if operation == 'probe' else 'Installatie loopt. Wacht tot deze stap klaar is.')
         self.task.start()
@@ -109,7 +113,7 @@ class GaitDynamicsSetupDialog(QDialog):
             self.details.appendPlainText('Installatielog: ' + value['log'])
 
     def _finished(self):
-        for button in (self.check, self.install, self.close_button):
+        for button in (self.check, self.install, self.update_button, self.close_button):
             button.setEnabled(True)
 
     def reject(self):

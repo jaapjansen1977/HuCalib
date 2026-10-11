@@ -42,6 +42,84 @@ class WslTests(unittest.TestCase):
             self.assertEqual(backend.install()['status'], 'unsupported')
         self.assertEqual(len(self.calls), 1)
 
+    def test_existing_generic_ubuntu_is_reused_only_when_actual_release_is_2404(self):
+        for release, expected in [('ubuntu 24.04', 'ready'), ('ubuntu 22.04', 'distribution_required'), ('debian 24.04', 'distribution_required')]:
+            with self.subTest(release=release):
+                self.calls.clear()
+                def run(args, **kwargs):
+                    self.calls.append((args, kwargs))
+                    output = '* docker-desktop Stopped 2\nUbuntu Stopped 2\n' if '--list' in args else release if '/bin/sh' in args else 'HU3D_READY'
+                    return subprocess.CompletedProcess(args, 0, output)
+                backend = self.backend(runner=run)
+                with patch('mocap_app.analysis.gaitdynamics_wsl.sys.platform', 'win32'):
+                    self.assertEqual(backend.probe()['status'], expected)
+                self.assertFalse(any('docker-desktop' in args for args, _ in self.calls))
+                if expected == 'ready':
+                    self.assertEqual(backend.distribution, 'Ubuntu')
+                    backend._linux(['echo', 'test'])
+                    self.assertIn('Ubuntu', self.calls[-1][0])
+                    self.assertEqual(backend._state('ready')['distribution'], 'Ubuntu')
+                else:
+                    self.assertEqual(len(self.calls), 2)
+
+    def test_missing_ubuntu2404_catalog_prompts_update_without_installing_runtime(self):
+        def run(args, **kwargs):
+            self.calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args, 4294967295 if '--install' in args else 0,
+                'Ongeldige distributienaam. Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND' if '--install' in args else 'Ubuntu Ubuntu\n')
+        backend = self.backend(runner=run)
+        with patch.object(backend, 'probe', return_value={'status': 'distribution_required'}):
+            result = backend.install()
+        self.assertEqual(result['status'], 'wsl_update_required')
+        self.assertIn('WSL bijwerken', result['message'])
+        self.assertEqual([args for args, _ in self.calls], [
+            ['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'],
+            ['wsl.exe', '--list', '--online']])
+
+    def test_other_distribution_install_errors_are_not_mislabeled_as_catalog_errors(self):
+        backend = self.backend(status=1, text='Access denied')
+        with patch.object(backend, 'probe', return_value={'status': 'distribution_required'}):
+            with self.assertRaisesRegex(RuntimeError, 'Access denied'):
+                backend.install()
+        self.assertEqual(len(self.calls), 1)
+
+    def test_wsl_update_uses_supported_options_and_does_not_report_runtime_readiness(self):
+        for help_text in ('--update --web-download', '--update'):
+            with self.subTest(help=help_text):
+                self.calls.clear()
+                def run(args, **kwargs):
+                    self.calls.append((args, kwargs))
+                    return subprocess.CompletedProcess(args, 0, help_text if '--help' in args else 'Ubuntu-24.04 Ubuntu 24.04 LTS\n')
+                backend = self.backend(runner=run)
+                with patch('mocap_app.analysis.gaitdynamics_wsl.sys.platform', 'win32'):
+                    result = backend.update()
+                self.assertEqual(result['status'], 'update_completed')
+                script = self.calls[1][0][-1]
+                self.assertIn('-Verb RunAs', script)
+                self.assertIn("'--update'", script)
+                self.assertEqual('--web-download' in script, '--web-download' in help_text)
+                self.assertEqual(self.calls[2][0], ['wsl.exe', '--list', '--online'])
+
+    def test_kernel_only_update_opens_official_store_and_requires_user_action(self):
+        backend = self.backend(text='Ubuntu Ubuntu\n')
+        with patch('mocap_app.analysis.gaitdynamics_wsl.sys.platform', 'win32'):
+            result = backend.update()
+        self.assertEqual(result['status'], 'store_update_required')
+        script = self.calls[-1][0][-1]
+        self.assertIn('ms-windows-store://pdp/?ProductId=9P9TQF7MRM4R', script)
+        self.assertNotIn('-Verb RunAs', script)
+
+    def test_denied_update_never_records_success_or_opens_store(self):
+        def run(args, **kwargs):
+            self.calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args, 1 if args[0] == 'powershell.exe' else 0, 'Canceled')
+        backend = self.backend(runner=run)
+        with patch('mocap_app.analysis.gaitdynamics_wsl.sys.platform', 'win32'):
+            with self.assertRaisesRegex(RuntimeError, 'niet worden bijgewerkt'):
+                backend.update()
+        self.assertEqual(len(self.calls), 2)
+        self.assertFalse((self.root / 'state/setup.json').exists())
+
     def test_first_install_requires_elevation_then_can_resume_after_restart(self):
         backend = self.backend()
         with patch.object(backend, 'probe', return_value={'status': 'install_required'}):
@@ -113,17 +191,24 @@ class WslTests(unittest.TestCase):
         self.assertNotIn('-Verb RunAs', args[-1])
 
     @unittest.skipUnless(sys.platform == 'win32', 'Requires the native Windows PowerShell parser')
-    def test_native_windows_parser_accepts_legacy_registration_script_without_executing_it(self):
+    def test_native_windows_parser_accepts_setup_scripts_without_executing_them(self):
         backend = self.backend()
         with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'distribution_required'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
             backend.install()
-        script = self.calls[1][0][-1]
+        scripts = [self.calls[1][0][-1]]
+        for help_text in ('--update --web-download', '--update'):
+            self.calls.clear()
+            backend = self.backend(text=help_text)
+            backend.update()
+            scripts.extend(args[-1] for args, _ in self.calls if args[0] == 'powershell.exe')
         parser = ("$source=[Console]::In.ReadToEnd(); $tokens=$null; $errors=$null; "
                   "[System.Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors) | Out-Null; "
                   "if ($errors.Count) { $errors | Out-String | Write-Output; exit 1 }")
-        result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', parser],
-                                input=script, capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for script in scripts:
+            with self.subTest(script=script):
+                result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', parser],
+                                        input=script, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_spaces_and_shell_metacharacters_are_passed_as_one_path_argument(self):
         backend = self.backend(text='/mnt/c/example')

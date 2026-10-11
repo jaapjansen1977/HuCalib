@@ -47,6 +47,7 @@ class WslBackend:
     def __init__(self, notify=lambda message: None, runner=None, state_dir=None):
         self.notify = notify
         self.runner = runner or self._run
+        self.distribution = DISTRIBUTION
         self.state_dir = Path(state_dir or Path(os.environ.get('LOCALAPPDATA', tempfile.gettempdir())) / 'HU3D-kinematics' / 'GaitDynamics')
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,14 +69,15 @@ class WslBackend:
         return result.stdout
 
     def _linux(self, arguments, user=USER, timeout=120, input=None):
-        return self._command(['wsl.exe', '--distribution', DISTRIBUTION, '--user', user, '--exec', *arguments], timeout, input)
+        return self._command(['wsl.exe', '--distribution', self.distribution, '--user', user, '--exec', *arguments], timeout, input)
 
     def _state(self, status, **values):
-        state = dict(status=status, distribution=DISTRIBUTION, **values)
+        state = dict(status=status, distribution=self.distribution, **values)
         (self.state_dir / 'setup.json').write_text(json.dumps(state, indent=2), encoding='utf-8')
         return state
 
     def probe(self):
+        self.distribution = DISTRIBUTION
         if sys.platform != 'win32':
             return dict(status='unavailable', message='Deze installatiewizard is voor Windows 10/11 x64.')
         try:
@@ -87,6 +89,15 @@ class WslBackend:
             return dict(status='install_required', message='WSL is nog niet gereed. Installatie of een herstart kan nodig zijn.', diagnostic=text)
         line = next((line for line in text.splitlines() if DISTRIBUTION in line.split()), None)
         if line is None:
+            # A distribution's registration name does not establish its OS
+            # version. Reuse Ubuntu only after reading its actual release.
+            ubuntu = next((entry for entry in text.splitlines() if 'Ubuntu' in entry.split() and entry.split()[-1] == '2'), None)
+            if ubuntu is not None:
+                release = self.runner(['wsl.exe', '-d', 'Ubuntu', '-u', 'root', '--exec',
+                    '/bin/sh', '-c', '. /etc/os-release; printf "%s %s\\n" "$ID" "$VERSION_ID"'], timeout=90, input=None)
+                if release.returncode == 0 and decode_output(release.stdout).strip() == 'ubuntu 24.04':
+                    self.distribution, line = 'Ubuntu', ubuntu
+        if line is None:
             return dict(status='distribution_required', message=f'{DISTRIBUTION} moet nog worden geïnstalleerd.')
         if line.split()[-1] != '2':
             return dict(status='unsupported', message=f'{DISTRIBUTION} gebruikt WSL1. Deze app verandert geen bestaande WSL1-installatie. Gebruik WSL2; zie de installatiehandleiding.')
@@ -95,12 +106,34 @@ class WslBackend:
             script = (f"import sys; sys.path.insert(0, '{PREFIX}/app-{identity}'); "
                       f"from mocap_app.analysis.gaitdynamics import verify_runtime; verify_runtime(__import__('pathlib').Path('{PREFIX}/runtime')); "
                       "import torch, nimblephysics; assert not torch.cuda.is_available(); print('HU3D_READY')")
-            result = self.runner(['wsl.exe', '-d', DISTRIBUTION, '-u', USER, '--exec', f'{PREFIX}/venv/bin/python', '-c', script], timeout=90, input=None)
+            result = self.runner(['wsl.exe', '-d', self.distribution, '-u', USER, '--exec', f'{PREFIX}/venv/bin/python', '-c', script], timeout=90, input=None)
             if result.returncode == 0 and 'HU3D_READY' in decode_output(result.stdout):
                 return dict(status='ready', message='GaitDynamics is gereed voor CPU-verwerking via WSL2.')
         except (OSError, ValueError):
             pass
         return dict(status='environment_required', message='WSL2 is aanwezig. De GaitDynamics-rekenomgeving moet nog worden klaargezet.')
+
+    def update(self):
+        if sys.platform != 'win32':
+            return dict(status='unavailable', message='WSL bijwerken is alleen beschikbaar op Windows.')
+        self.notify('WSL wordt bijgewerkt via Microsoft. Windows kan om beheerderstoestemming vragen. Sluit lopende Docker- en WSL-taken voordat je bijwerkt.')
+        help_text = self._command(['wsl.exe', '--help'])
+        arguments = "'--update','--web-download'" if '--web-download' in help_text else "'--update'"
+        script = ("$ErrorActionPreference='Stop'; $p=Start-Process -FilePath wsl.exe -Verb RunAs "
+                  f"-ArgumentList {arguments} -Wait -PassThru; exit $p.ExitCode")
+        result = self.runner(['powershell.exe', '-NoProfile', '-Command', script], timeout=1800, input=None)
+        if result.returncode not in (0, 3010):
+            raise RuntimeError('WSL kon niet worden bijgewerkt: ' + decode_output(result.stdout)[-3000:])
+        if result.returncode == 0:
+            catalog = self._command(['wsl.exe', '--list', '--online'], timeout=120)
+            if not any(DISTRIBUTION in line.split() for line in catalog.splitlines()):
+                # Some inbox clients update only the kernel with --update.
+                # Open Microsoft's WSL product in the original user's Store,
+                # instead of treating a successful kernel update as a fix.
+                self._command(['powershell.exe', '-NoProfile', '-Command',
+                    "Start-Process 'ms-windows-store://pdp/?ProductId=9P9TQF7MRM4R'"])
+                return self._state('store_update_required', message='Microsoft Store is geopend voor Windows Subsystem for Linux. Klik daar op Bijwerken of Installeren. Open daarna de app opnieuw en klik op Installeren / doorgaan. Ubuntu 24.04 is nog niet beschikbaar in jouw WSL-catalogus.')
+        return self._state('update_completed', message='De WSL-updateopdracht is voltooid. Herstart Windows als dit is gevraagd; klik daarna op Installeren / doorgaan. De app controleert opnieuw welke distributies beschikbaar zijn.')
 
     def install(self):
         status = self.probe()
@@ -121,7 +154,13 @@ class WslBackend:
             self.notify('Ubuntu 24.04 wordt onder jouw Windows-account geïnstalleerd, zonder interactieve eerste start.')
             # Older WSL clients reject --version on --install, printing their
             # entire help and returning 0xffffffff. Check WSL2 after installing.
-            self._command(['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'], timeout=1800)
+            try:
+                self._command(['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'], timeout=1800)
+            except RuntimeError as error:
+                if 'WSL_E_DISTRO_NOT_FOUND' not in str(error):
+                    raise
+                self._command(['wsl.exe', '--list', '--online'], timeout=120)
+                return self._state('wsl_update_required', message='Deze WSL-versie biedt Ubuntu 24.04 niet aan. Klik op WSL bijwerken en accepteer eventuele Windows-toestemming. Klik daarna op Installeren / doorgaan.')
             status = self.probe()
             if status['status'] == 'distribution_required':
                 # Legacy Store distributions are downloaded by --install but
@@ -222,7 +261,7 @@ test "$(id -u {USER})" != 0
             from mocap_app.analysis.gaitdynamics import sha256
             if result.get('status') != 'completed' or sha256(output / 'ground_reaction_forces.mot') != result['result']['sha256']:
                 raise ValueError('De teruggegeven krachtresultaten zijn niet volledig of beschadigd.')
-            (output / 'windows-transport.json').write_text(json.dumps(dict(distribution=DISTRIBUTION,
+            (output / 'windows-transport.json').write_text(json.dumps(dict(distribution=self.distribution,
                 windows_motion=str(Path(motion).absolute()), windows_model=str(Path(model).absolute()),
                 windows_output=str(output), height_m=height, mass_kg=mass, treadmill_speed_m_s=speed,
                 payload=payload_id()), indent=2), encoding='utf-8')

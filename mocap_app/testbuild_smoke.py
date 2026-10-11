@@ -82,7 +82,7 @@ def run_smoke(report_path: str) -> int:
                             assert gait.rect().contains(position + button.rect().bottomRight())
                     gait.close()
                     for view, buttons in (
-                        (GaitDynamicsSetupDialog(dialog), ('check', 'install', 'close_button')),
+                        (GaitDynamicsSetupDialog(dialog), ('check', 'install', 'update_button', 'close_button')),
                         (GaitDynamicsRunDialog(sample, sample_model, dialog),
                          ('install_button', 'start_button', 'view_button', 'folder_button', 'close_button'))):
                         view.show()

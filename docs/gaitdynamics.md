@@ -33,6 +33,12 @@ binnen WSL2 draaien; je hoeft daarvoor geen Linux-opdrachten in te voeren.
    zet uitsluitend een zojuist nieuw geïnstalleerde WSL1-distributie om naar WSL2.
    Bij oudere WSL-versies rondt de app ook de eerste registratie van het
    officiële Ubuntu 24.04 Store-pakket af, zonder interactieve accountvragen.
+   Meldt de app dat Ubuntu 24.04 niet beschikbaar is? Sluit lopende Docker- en
+   WSL-taken en klik op **WSL bijwerken**. Accepteer eventuele
+   beheerderstoestemming. Als alleen de oude WSL-kernel wordt bijgewerkt,
+   opent de app de officiële WSL-pagina in Microsoft Store: klik daar op
+   **Bijwerken** of **Installeren**. Herstart als Windows dit vraagt en open
+   daarna de app opnieuw. Klik op **Installeren / doorgaan**.
 4. Wacht tot **GaitDynamics is gereed** verschijnt. De app installeert een
    afzonderlijke Python 3.12-omgeving, CPU-PyTorch en nimblephysics binnen
    Ubuntu. Beide AI-modellen worden met vastgelegde SHA256-hashes gecontroleerd.
@@ -51,7 +57,10 @@ Er is geen handmatige Linux-accountregistratie nodig: de app gebruikt een
 afzonderlijke systeemgebruiker `hu3d-gait`, uitsluitend via `wsl --exec`.
 De rekenomgeving staat onder `/opt/hu3d-gaitdynamics`. Een al aanwezige
 **Ubuntu 24.04 met WSL2** wordt gebruikt; daarin voegt de app systeempakketten
-toe. Andere distributies en bestaande Python-omgevingen blijven behouden.
+toe. Ook de registratienaam **Ubuntu** wordt herkend als `/etc/os-release`
+bevestigt dat deze werkelijk Ubuntu 24.04 is. Ubuntu 20.04/22.04 wordt niet
+automatisch opgewaardeerd; Docker wordt niet als rekenomgeving gebruikt.
+Andere distributies en bestaande Python-omgevingen blijven behouden.
 Een bestaande Ubuntu 24.04 met WSL1 wordt niet automatisch omgezet.
 De draagbare testbuild heeft geen installatieprogramma dat WSL2 stilzwijgend
 installeert: je start de expliciete wizard vanuit de app of via het CMD-bestand.
