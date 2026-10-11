@@ -133,6 +133,57 @@ de uitgebreide trajectfile bevat 96 rijen met 65 markers. OpenSim leverde 96
 tijdstappen met 62 coördinaten. De waarden zijn eindig, het geschaalde model kan
 worden geladen en de bron-/kopiehashes komen overeen. Alle 41 unit-tests slagen.
 
+### Waarom deze demo maar circa 1,6 seconde oplevert
+
+Op 11 oktober 2026 zijn de bestanden uit de gebruikte Pose2Sim-commit
+`68304b47195dac80bc341cdfd9669140609358c4` opnieuw met `ffprobe -count_frames`
+onderzocht. **Alle vier originele `Demo_SinglePerson/videos/cam*.mp4` bevatten
+100 decodeerbare frames bij 60 FPS, dus 1,666667 seconde video.** De SHA256-hashes
+komen exact overeen met `tools/prepare_windows_demo.py`. De testbuild heeft geen
+langere opname ingekort: dat script downloadt de oorspronkelijke bestanden en
+`import_demo` kopieert ze zonder hercodering en registreert tot het einde.
+
+| Stap | Aantal / tijd | Bewijs en beperking |
+| --- | --- | --- |
+| Originele cameravideo's | 100 frames per camera, 60 FPS | Opnieuw volledig geteld met ffprobe; hashes gelijk aan de testkit |
+| Pose-detectie | 100 JSON-bestanden per camera | Vastgelegd in de eerdere cloudproef |
+| Ruwe 3D-trajecten | 97 meetregels | Vastgelegd in de eerdere cloudproef; oorspronkelijke synchronisatie- en triangulatielogs zijn in deze workspace niet beschikbaar |
+| Gefilterde trajecten / OpenSim | 96 meetregels | Upstream filtering sluit de laatste regel uit; eindresultaat heeft daadwerkelijk 96 tijdstappen |
+| Geüpload `motion.mot` | 0,01666667 tot 1,60000000 s | 96 meetregels; verschil eerste-laatste tijdstip is 1,58333333 s |
+| GaitDynamics-referentie | 159 rijen bij 100 Hz, tot circa 1,59667 s | Resampling binnen hetzelfde tijdsinterval; geen extra bewegingsduur |
+
+Het configuratiesjabloon heeft `project.frame_range = 'auto'`, geen expliciete
+limiet van 100 of 96 frames. De HuCalib-analysemodule verandert het projectpad en
+de FPS, maar stelt geen kort framebereik in. Pose2Sim kan bij synchronisatie en
+triangulatie wel de gezamenlijke/geldige periode beperken. De precieze verdeling
+van de drie verdwenen regels tussen 100 invoerframes en 97 trajectregels vereist
+de oorspronkelijke `synchronization.log`, `triangulation.log` en tussenbestanden.
+Die verdeling wordt hier niet als vastgesteld gepresenteerd.
+
+Voor de stap 97 naar 96 is er concreet bewijs in
+[Pose2Sim filtering.py](https://github.com/perfanalytics/pose2sim/blob/68304b47195dac80bc341cdfd9669140609358c4/Pose2Sim/filtering.py#L904):
+bij `auto`/`all` gebruikt de code het laatste framenummer als exclusieve bovengrens
+en selecteert vervolgens tot dat nummer minus één. Daardoor verdwijnt de laatste
+meetregel. Dezelfde indexberekening is afzonderlijk gereproduceerd: 97
+opeenvolgende framenummers leveren 96 geselecteerde regels op. Dit is een
+grensfout in deze upstreamversie, geen fysieke beperking van filtering en geen
+HuCalib-duurlimiet. Er is in dit onderzoek geen runtime-code gewijzigd.
+
+In dezelfde bronversie zijn ook de cameravideo's van `Demo_MultiPerson` en beide
+`Demo_Batch`-trials 100 frames bij 60 FPS. De langere bestanden
+`Content/Pose2Sim Blender.mp4` (40,733333 s, 1.222 frames bij 30 FPS) en
+`Content/Pose2Sim_Blender_short.mp4` (8,9 s, 267 frames bij 30 FPS) staan bij de
+Blender-presentatie. Zij vormen geen vervangende set van vier gekalibreerde
+cameravideo's. Andere, niet onderzochte videoverzamelingen kunnen wel langere
+bruikbare opnamen bevatten; controleer dan de afzonderlijke camerabestanden,
+kalibratie en synchronisatie.
+
+**Gevolg:** `frame_range` verruimen maakt deze bronvideo's niet langer. Voor een
+echte duurtest is een langere meercamera-opname met passende kalibratie nodig.
+De korte bestanden herhalen kan uitsluitend een technische belastingproef
+opleveren, geen langere onafhankelijke beweging of betrouwbare dynamische
+analyse door de sprongen bij iedere herhaling.
+
 Hieronder staan de berekende heup-, knie- en enkelhoeken uit deze demo.
 Blauw is links, oranje is rechts. Dit is een functionele demonstratie;
 de meetnauwkeurigheid is niet gevalideerd.
