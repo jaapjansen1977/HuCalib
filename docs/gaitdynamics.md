@@ -22,7 +22,9 @@ De bestaande voorbeeldresultaten zijn ook gebruikt voor een
 [reproduceerbare inverse-dynamicaproef](examples/inverse-dynamica/README.md).
 Daar staan de invoerbestanden, netto coördinaatmomenten, restbelastingen,
 filtergevoeligheid, OpenSim-instellingen en het uitvoerbare script bij elkaar.
-De proef is technisch gecontroleerd maar heeft grote restbelastingen en twee
+De gebruiker heeft deze beweging geïdentificeerd als een eenbenige
+evenwichtsoefening. GaitDynamics-krachten zijn voor deze beweging niet
+gevalideerd. De proef heeft bovendien grote restbelastingen en twee
 niet-fysische teeninertieën. De uitkomsten zijn diagnostisch en niet klinisch
 gevalideerd. Deze berekening is een afzonderlijk onderzoek en zit niet in de app.
 

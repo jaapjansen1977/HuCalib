@@ -6,6 +6,26 @@ bewegingscoördinaat op, inclusief zwaartekracht, segmentmassa's en traagheid.
 De restbelastingen zijn echter groot. Deze proef valideert geen klinische
 gewrichtsmomenten en is niet toegevoegd aan de Windows-app.
 
+## Correctie: dit is geen loopbeweging
+
+De gebruiker heeft bevestigd dat de geanalyseerde beweging een
+**evenwichtsoefening op één been** is. Deze classificatie komt van de gebruiker,
+niet uit een automatische bewegingsherkenning. De steunvoet en eventuele
+andere steuncontacten zijn nog niet vastgesteld.
+
+GaitDynamics is bedoeld voor loop-/hardloopdynamica. Voor deze evenwichtsoefening
+is de betrouwbaarheid van de voorspelde krachten en CoPs niet aangetoond.
+De eerdere kracht- en momentgrafieken moeten daarom worden gelezen als een
+technische proef met invoer buiten het aangetoonde toepassingsgebied.
+Een geslaagde inverse-dynamicaberekening maakt die krachten niet betrouwbaar.
+De grote restbelastingen passen bij een mismatch, maar bewijzen niet dat de
+bewegingssoort de enige oorzaak is.
+
+Inverse dynamica zelf is ook geschikt voor evenwichtsoefeningen, mits de
+beweging, segmentparameters en externe belastingen voldoende betrouwbaar zijn.
+De looproute uit het aangehaalde OpenCap-artikel rechtvaardigt geen
+GaitDynamics-krachtvoorspelling voor deze oefening.
+
 ## Resultaten bekijken
 
 - [Netto momenten: PNG](inverse-dynamica-momenten.png) · [PDF](inverse-dynamica-momenten.pdf)
@@ -233,20 +253,33 @@ heeft voor deze projectie dus een momentdimensie. Het script koppelt op
 coördinaatnaam en neemt niet blind die automatische kolomachtervoegsels over.
 De `.sto`-bestanden van de standaard-tool zijn niet al geprojecteerd.
 
-## Vervolgvolgorde — nog niet uitgevoerd
+## Vervolgvolgorde — aangepast na bewegingscorrectie; nog niet uitgevoerd
 
-1. Lokaliseer de restkrachtmismatch door massamiddelpuntversnelling en totale
-   grondreactiekracht per as naast elkaar te beoordelen, inclusief filterkeuze.
-2. Controleer CoP/voetkoppeling en het gereduceerde model tegen de oorspronkelijke
-   volledige Pose2Sim-beweging en het volledige model. Die bestanden zijn
-   niet onderdeel van de huidige geüploade conversiebestanden.
-3. Controleer/herstel teensegmenttraagheden vanuit een onderbouwd bronmodel;
-   bepaal hoe contact over hiel en tenen moet worden verdeeld.
-4. Herhaal de inverse dynamica met gedocumenteerde model- en invoerkeuzes.
-   Selecteer een filter niet uitsluitend omdat het de restkracht verlaagt.
-5. Onderzoek daarna gezamenlijke beweging-/krachtoptimalisatie en
-   gewrichtsreactiemomenten voor een anatomisch knie-adductiemoment.
-   Pas na deze controles is app-integratie een zinvolle afzonderlijke stap.
+1. Stel vast welke voet de steunvoet is, wanneer er één of twee voetcontacten
+   zijn en of er handsteun of andere externe belastingen zijn. Beoordeel een
+   periode met werkelijk één steuncontact afzonderlijk.
+2. Gebruik bij voorkeur de oorspronkelijke volledige Pose2Sim-beweging en
+   het volledige model. De afzonderlijke arm-/rompbeweging is bij balans
+   relevant en is in de aangeleverde gereduceerde bestanden verloren gegaan.
+   Controleer ook de twee niet-fysische teeninertieën.
+3. Gebruik gemeten krachten als ze beschikbaar zijn. Voor een periode met
+   precies één steunvoet, alleen zwaartekracht en geen andere contacten kan
+   de totale contactbelasting ook uit de volledige lichaamsdynamica worden
+   afgeleid: `F_contact = m (a_COM - g)`. De totale contactmomentvector volgt
+   uit de verandering van het impulsmoment en het zwaartekrachtsmoment.
+   Daarmee is geen loopgericht AI-krachtmodel nodig.
+4. Een CoP en vrij voetmoment volgen niet zonder aanvullende keuzes. Leg de
+   contactvlakhoogte en toegestane vrije momentcomponenten vast; controleer
+   of de CoP binnen het steunvlak en de krachten binnen fysische contactgrenzen
+   liggen. Bij meerdere contacten is de verdeling over die contacten niet
+   uniek af te leiden uit alleen de hele-lichaamsbalans.
+5. Voer vervolgens inverse dynamica opnieuw uit met die gedocumenteerde
+   belastingen en modelkeuzes. Een hele-lichaamsbelasting uit dezelfde beweging
+   maakt de globale balans per constructie kloppend; een kleine restbelasting
+   is dan **geen onafhankelijke nauwkeurigheidsvalidatie**.
+6. Als alleen een benadering nodig is, kan een quasi-statische balans worden
+   onderzocht, maar `F ≈ m g` mag niet zonder controle op versnellingen en
+   arm-/rompbeweging worden aangenomen. App-integratie blijft een latere stap.
 
 ## Bronnen en afbakening tegenover het artikel
 

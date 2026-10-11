@@ -15,7 +15,7 @@
     "model-numerical.osim": "27c65d04092ea10049b165a25912585347df63d866ef83edc711f20a7141aa96"
   },
   "mass_kg": 70.00000000000001,
-  "result_status": "diagnostic_only_large_residuals_not_clinically_validated",
+  "result_status": "diagnostic_only_non_gait_activity_force_prediction_not_validated",
   "gravity_m_per_s2": [
     0.0,
     -9.80665,
@@ -1309,6 +1309,7 @@
     }
   },
   "limitations": [
+    "User identifies this motion as a single-leg balance exercise, not walking/running; GaitDynamics force accuracy is not established for this activity.",
     "Predicted rather than measured GRFs and CoPs; no free contact moments.",
     "Segment masses and inertia matrices are present and positive definite, but toes_r and toes_l violate the rigid-body inertia triangle inequality; original values retained. Participant-specific inertial accuracy is not established.",
     "Upper-body segments, head and arms were merged into a rigid torso in the existing conversion; neutral-pose inertia does not preserve their independent dynamics.",
@@ -1316,5 +1317,12 @@
     "Coordinate torques are not 3-axis joint reaction moments; knee adduction is not reported.",
     "Short 1.58-second demo; endpoint derivatives and filter sensitivity limit interpretation.",
     "Force assignment to calcn is a whole-foot wrench assumption; toe/subtalar load partition is unvalidated."
-  ]
+  ],
+  "movement_context": {
+    "activity": "single_leg_balance_exercise",
+    "source": "user clarification",
+    "stance_foot": "not yet established",
+    "other_contacts": "not yet established",
+    "gaitdynamics_force_accuracy_validated_for_activity": false
+  }
 }

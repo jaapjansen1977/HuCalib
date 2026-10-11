@@ -5,6 +5,12 @@ voorbeeldresultaten. Ze berekent de bijdrage van de rechter grondreactiekracht
 rond rechter heup, knie en enkel, en die van de linker grondreactiekracht rond
 de overeenkomstige linker gewrichten. Alle drie ascomponenten zijn in Nm.
 
+**Correctie van de bewegingscontext:** de gebruiker identificeert deze proef als
+een eenbenige evenwichtsoefening, geen loopbeweging. De GaitDynamics-krachten
+zijn voor deze beweging niet gevalideerd. Deze grafieken zijn daarmee
+uitsluitend een technische berekening op basis van die voorspellingen.
+Zie de [vastgelegde gevolgen en vervolgroute](../inverse-dynamica/README.md#correctie-dit-is-geen-loopbeweging).
+
 ## Grafieken
 
 **Lokale gewrichtsassen uit het OpenSim-model:**
