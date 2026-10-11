@@ -8,6 +8,7 @@ on:
       - 'mocap_app/analysis/model_conversion.py'
       - 'mocap_app/analysis/gaitdynamics*.py'
       - 'tools/smoke_pose2sim_gaitdynamics.py'
+      - 'tools/smoke_wsl_gaitdynamics.py'
       - 'tests/test_model_conversion_integration.py'
   workflow_dispatch:
 
@@ -48,6 +49,13 @@ jobs:
       - name: Volledige bewegingsanalyse en krachtvoorspelling
         shell: bash
         run: .venv-pose/bin/python tools/smoke_pose2sim_gaitdynamics.py --demo Demo --output model-validation --runtime gait-runtime --gait-python .venv-gait/bin/python 2>&1 | tee model-pipeline.log
+      - name: Dezelfde viercameraresultaten via de Windows-adapter (WSL-transport nagebootst)
+        shell: bash
+        run: >-
+          .venv-gait/bin/python tools/smoke_wsl_gaitdynamics.py --runtime gait-runtime
+          --motion model-validation/conversion/motion.mot
+          --model model-validation/conversion/model.osim
+          --output model-validation/transport-result 2>&1 | tee transport-pipeline.log
       - name: Resultaat of laatste fout publiceren
         if: always()
         env:
@@ -58,7 +66,7 @@ jobs:
           import os
           import json
           root = Path('model-validation')
-          paths = [root / 'validation.json', root / 'conversion/conversion.json', root / 'gaitdynamics/gaitdynamics.log', Path('model-pipeline.log'), Path('conversion-tests.log')]
+          paths = [root / 'validation.json', root / 'conversion/conversion.json', root / 'gaitdynamics/gaitdynamics.log', root / 'transport-result/transport-validation.json', root / 'transport-result/gaitdynamics.log', Path('transport-pipeline.log'), Path('model-pipeline.log'), Path('conversion-tests.log')]
           paths += sorted((root / 'pose2sim').glob('*.log'), key=lambda p: p.stat().st_mtime)[-1:]
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               for p in paths:
@@ -80,9 +88,11 @@ jobs:
           path: |
             conversion-tests.log
             model-pipeline.log
+            transport-pipeline.log
             model-validation/validation.json
             model-validation/conversion/
             model-validation/gaitdynamics/
+            model-validation/transport-result/
             model-validation/pose2sim/analysis.json
             model-validation/pose2sim/*.log
           if-no-files-found: ignore
