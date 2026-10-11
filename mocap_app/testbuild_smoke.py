@@ -58,6 +58,13 @@ def run_smoke(report_path: str) -> int:
                     assert len(payload_id()) == 64
                     assert all(path.is_file() for path in payload_files()[1:])
                     assert hasattr(window, 'actionInstallGaitDynamics')
+                    window.actionGaitDynamicsFiles.trigger()
+                    app.processEvents()
+                    existing_files = window._gait_files_dialog
+                    assert existing_files.isVisible()
+                    assert not existing_files.convert_button.isEnabled()
+                    assert not existing_files.motion.text() and not existing_files.model.text()
+                    existing_files.close()
                     sample = root / 'example.mot'
                     sample.write_text('nRows=2\nnColumns=2\ninDegrees=yes\nendheader\ntime knee_angle_r\n0 10\n.1 20\n')
                     view = MotionResultsDialog(sample, dialog)
@@ -104,6 +111,7 @@ def run_smoke(report_path: str) -> int:
                                   gaitdynamics_input_dialog_opens=True, model_conversion_runtime_present=True,
                                   model_conversion_controls_fit_small_screen=True,
                                   wsl_setup_payload_present=True, wsl_dialogs_fit_small_screen=True,
+                                  existing_gait_files_menu_opens=True,
                                   wsl_installed_during_smoke=False)
                 except Exception as error:
                     result.update(status='failed', error=repr(error))

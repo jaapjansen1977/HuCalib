@@ -13,6 +13,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import traceback
 import xml.etree.ElementTree as ET
 
 UPSTREAM_COMMIT = '8dc5aed58161a129fd2d58ff071cb802f2654be9'
@@ -190,7 +191,10 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
     save()
     try:
         for original, target in ((motion, inputs / 'motion.mot'), (model, inputs / 'model.osim')):
-            shutil.copy2(original, target)
+            # DrvFS can deny copying Unix permissions/timestamps even when
+            # file content is writable by our WSL service user. Only bytes
+            # are relevant to inference; their integrity is checked below.
+            shutil.copyfile(original, target)
             if sha256(original) != sha256(target):
                 raise GaitDynamicsError('De invoer is gewijzigd tijdens het kopiëren.')
         conversion_path = motion.parent / 'conversion.json'
@@ -201,7 +205,7 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
             if conversion.get('status') != 'completed' or any(
                     artifacts.get(path.name) != sha256(path) for path in (motion, model, reference)):
                 raise GaitDynamicsError('Conversierapport en invoer horen niet aantoonbaar bij elkaar.')
-            shutil.copy2(reference, inputs / reference.name)
+            shutil.copyfile(reference, inputs / reference.name)
             report['conversion'] = conversion
             report['warnings'].extend(conversion['warnings'])
         report['input_sha256'] = {p.name: sha256(p) for p in inputs.iterdir()}
@@ -231,13 +235,19 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
         if names != expected:
             raise GaitDynamicsError('GaitDynamics-resultaat heeft onverwachte kolommen.')
         target = output / 'ground_reaction_forces.mot'
-        shutil.copy2(result, target)
+        shutil.copyfile(result, target)
         report.update(status='completed', result={'path': target.name, 'sha256': sha256(target),
             'rows': len(rows), 'sampling_rate_hz': 100, 'time_range_s': [rows[0][0], rows[-1][0]],
             'force_unit': 'N', 'cop_unit': 'm', 'right_foot': 'force1', 'left_foot': 'force2'})
         report['environment'] = environment_report
     except Exception as error:
-        report.update(status='failed', error=f'{type(error).__name__}: {error}')
+        details = traceback.format_exc()
+        report.update(status='failed', error=f'{type(error).__name__}: {error}', traceback=details)
+        try:
+            with (output / 'gaitdynamics.log').open('a', encoding='utf-8') as log:
+                log.write('\n' + details)
+        except OSError as log_error:
+            report['diagnostic_log_error'] = str(log_error)
         raise
     finally:
         report['finished_at_utc'] = datetime.now(timezone.utc).isoformat()

@@ -1,9 +1,14 @@
 from pathlib import Path
+import errno
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from mocap_app.analysis.gaitdynamics import (COORDINATES, GaitDynamicsError,
-    inspect_inputs, prepare_inference_motion, read_motion, run_analysis, verify_runtime)
+    MODEL_HASHES, inspect_inputs, prepare_inference_motion, read_motion, run_analysis, sha256, verify_runtime)
 
 
 class GaitDynamicsTests(unittest.TestCase):
@@ -73,6 +78,57 @@ class GaitDynamicsTests(unittest.TestCase):
     def test_anthropometrics_must_be_finite_and_explicit(self):
         with self.assertRaises(GaitDynamicsError):
             run_analysis(self.motion, self.model, self.root / 'output', self.root, Path('python'), 1.75, float('nan'), 0)
+
+    def test_wsl_windows_files_can_complete_when_copying_metadata_is_forbidden(self):
+        runtime = self.root / 'runtime'
+        runtime.mkdir()
+        for name in MODEL_HASHES:
+            (runtime / name).write_bytes(b'test model')
+        reference = self.root / 'kinematics-reference.json'
+        reference.write_text('{}')
+        (self.root / 'conversion.json').write_text(json.dumps(dict(status='completed', warnings=[],
+            artifacts={path.name: sha256(path) for path in (self.motion, self.model, reference)})))
+        originals = {path: path.read_bytes() for path in (self.motion, self.model, reference)}
+        output = self.root / 'output'
+        columns = ['time'] + [f'{prefix}{side}_{axis}' for side in (1, 2)
+            for prefix, axes in (('force', ('vx', 'vy', 'vz', 'px', 'py', 'pz')), ('torque', ('x', 'y', 'z')))
+            for axis in axes]
+        def worker(command, **options):
+            # AI execution is stubbed; exercise actual input copies, reference
+            # verification, output validation and the final result copy.
+            for original in originals:
+                self.assertEqual((output / 'inputs' / original.name).read_bytes(), originals[original])
+            (output / 'inputs/motion_grf_pred___.mot').write_text('nRows=200\nnColumns=19\nendheader\n' +
+                '\t'.join(columns) + '\n' + '\n'.join('\t'.join([str(i / 100)] + ['0'] * 18) for i in range(200)))
+            (output / 'environment.json').write_text(json.dumps(dict(
+                preprocessing=dict(output_frames=200, output_time_range_s=[0, 1.99]))))
+            return subprocess.CompletedProcess(command, 0)
+        with patch('mocap_app.analysis.gaitdynamics.verify_runtime'), \
+                patch('shutil.copystat', side_effect=PermissionError(errno.EPERM, 'Operation not permitted')) as metadata, \
+                patch('mocap_app.analysis.gaitdynamics.subprocess.run', side_effect=worker):
+            result = run_analysis(self.motion, self.model, output, runtime, Path(sys.executable), 1.75, 70, 0)
+        metadata.assert_not_called()
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['result']['sha256'], sha256(output / 'ground_reaction_forces.mot'))
+        self.assertEqual(result['result']['rows'], 200)
+        for original, data in originals.items():
+            self.assertEqual(original.read_bytes(), data)
+
+    def test_pre_worker_permission_error_records_traceback_without_reporting_success(self):
+        output = self.root / 'output'
+        error = PermissionError(errno.EPERM, 'Operation not permitted', str(output / 'inputs/motion.mot'))
+        with patch('mocap_app.analysis.gaitdynamics.verify_runtime'), \
+                patch('mocap_app.analysis.gaitdynamics.shutil.copyfile', side_effect=error), \
+                patch('mocap_app.analysis.gaitdynamics.subprocess.run') as worker:
+            with self.assertRaises(PermissionError):
+                run_analysis(self.motion, self.model, output, self.root / 'runtime', Path(sys.executable), 1.75, 70, 0)
+        worker.assert_not_called()
+        report = json.loads((output / 'gaitdynamics.json').read_text())
+        self.assertEqual(report['status'], 'failed')
+        self.assertIn('PermissionError', report['traceback'])
+        self.assertIn('copyfile', report['traceback'])
+        self.assertIn('Operation not permitted', (output / 'gaitdynamics.log').read_text())
+        self.assertFalse((output / 'ground_reaction_forces.mot').exists())
 
     def test_noninteger_camera_rate_uses_real_time_without_extrapolation_or_clock_drift(self):
         self.write_motion(rows=600)

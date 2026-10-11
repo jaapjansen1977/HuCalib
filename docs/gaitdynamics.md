@@ -79,6 +79,10 @@ Installatie- en transportfouten staan in
 `%LOCALAPPDATA%\HU3D-kinematics\GaitDynamics\setup.log`.
 Als de rekenmodule is gestart, staan uitgebreidere foutdetails in de gekozen
 resultaatmap in `gaitdynamics.log` en `gaitdynamics.json`.
+Ook fouten bij het voorbereiden van de invoer krijgen daar een traceback.
+De adapter kopieert bestandsinhoud zonder Unix-rechten of tijdstempels over te
+nemen: WSL kan zulke metadatawijzigingen op een Windows-schijf weigeren.
+De SHA256-controles van invoer en uitvoer blijven van toepassing.
 Bij virtualisatie-, kernel- of WSL-installatiefouten:
 [Microsofts WSL-installatiehandleiding](https://learn.microsoft.com/windows/wsl/install)
 en [probleemoplossing](https://learn.microsoft.com/windows/wsl/troubleshooting).
@@ -120,6 +124,11 @@ ze bij GaitDynamics zonder de oorspronkelijke voetbeweging te veranderen.
 Uitvoer: `motion.mot` met 23 coördinaten, `model.osim`, `conversion.json`,
 `conversion.log` bij gebruik van de interface, en `kinematics-reference.json`
 voor de onafhankelijke controle in nimblephysics. Bronnen blijven behouden.
+Je kunt een bestaande conversie ook na het herstarten van de app gebruiken:
+kies **Analyse → GaitDynamics met bestaande bestanden…** en selecteer
+`motion.mot` en `model.osim` uit dezelfde map `GaitDynamics-conversie-…`.
+Klik op **Invoer controleren** en daarna **Krachten voorspellen…**.
+De analyseomgeving is alleen nodig als je opnieuw wilt converteren.
 De tijdstippen en alle frames blijven behouden; ontbrekende hoeken of gaten
 worden niet ingevuld. Graden en radialen worden expliciet verwerkt.
 

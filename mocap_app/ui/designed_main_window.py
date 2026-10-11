@@ -4447,10 +4447,23 @@ class DesignedMainWindow(FunctionalMainWindow, Ui_MainWindow):
         self.actionAnalyzeRecording = QtGui.QAction('Bewegingsanalyse…', self)
         self.actionAnalyzeRecording.triggered.connect(self._on_open_analysis)
         self.menuAnalysis.addAction(self.actionAnalyzeRecording)
+        self.actionGaitDynamicsFiles = QtGui.QAction('GaitDynamics met bestaande bestanden…', self)
+        self.actionGaitDynamicsFiles.triggered.connect(self._open_gaitdynamics_files)
+        self.menuAnalysis.addAction(self.actionGaitDynamicsFiles)
         self.actionInstallGaitDynamics = QtGui.QAction('GaitDynamics installeren…', self)
         self.actionInstallGaitDynamics.triggered.connect(self._open_gaitdynamics_setup)
         self.menuAnalysis.addAction(self.actionInstallGaitDynamics)
         self.menuBar.insertMenu(self.menuHelp.menuAction(), self.menuAnalysis)
+
+    def _open_gaitdynamics_files(self):
+        from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
+        existing = getattr(self, '_gait_files_dialog', None)
+        if existing is None:
+            existing = self._gait_files_dialog = GaitDynamicsDialog(None, None, self)
+            existing.setModal(True)
+        existing.show()
+        existing.raise_()
+        existing.activateWindow()
 
     def _open_gaitdynamics_setup(self):
         from mocap_app.ui.gaitdynamics_setup_dialog import GaitDynamicsSetupDialog

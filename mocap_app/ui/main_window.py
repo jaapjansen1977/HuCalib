@@ -3557,8 +3557,10 @@ class MainWindow(QMainWindow):
         """Refuse to close while a solve runs; otherwise stop all workers,
         wait for a pending re-encode and persist the advanced settings."""
         gait_setup = getattr(self, '_gait_setup_dialog', None)
+        gait_files = getattr(self, '_gait_files_dialog', None)
         if ((self._analysis_dialog is not None and self._analysis_dialog.busy) or
-                (gait_setup is not None and gait_setup.busy)):
+                (gait_setup is not None and gait_setup.busy) or
+                (gait_files is not None and gait_files.busy)):
             self._show_warning('Wacht tot de analyse, modelconversie, installatie of krachtberekening is afgerond voordat je de app sluit.')
             event.ignore()
             return
