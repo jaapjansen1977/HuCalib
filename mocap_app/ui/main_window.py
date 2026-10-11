@@ -3556,8 +3556,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Refuse to close while a solve runs; otherwise stop all workers,
         wait for a pending re-encode and persist the advanced settings."""
-        if self._analysis_dialog is not None and self._analysis_dialog.busy:
-            self._show_warning('Wacht tot de analyse, opnamecontrole of modelconversie is afgerond voordat je de app sluit.')
+        gait_setup = getattr(self, '_gait_setup_dialog', None)
+        if ((self._analysis_dialog is not None and self._analysis_dialog.busy) or
+                (gait_setup is not None and gait_setup.busy)):
+            self._show_warning('Wacht tot de analyse, modelconversie, installatie of krachtberekening is afgerond voordat je de app sluit.')
             event.ignore()
             return
         if self._intrinsics_solve_worker is not None and self._intrinsics_solve_worker.isRunning():

@@ -38,11 +38,18 @@ Demo/opname/                     # vier video's, manifest, framelog, kalibratiek
 Demo/Config.toml                 # officiële Pose2Sim-demo-instellingen
 setup_analysis.ps1
 requirements-pose2sim.txt
+Installeer-GaitDynamics.cmd       # optionele begeleide WSL2-installatie in de app
 LEESMIJ-WINDOWS.md
 frozen-gui-smoke.json             # startproef van de daadwerkelijk gebouwde exe
 build-dependencies.txt
 SHA256SUMS.txt
 ```
+
+Voor GaitDynamics kies je **Analyse → GaitDynamics installeren…**. Je hoeft
+geen Linux-opdrachten te typen. Klik na een eventuele Windows-herstart opnieuw
+op **Installeren / doorgaan**. De werking op een echte Windows-computer met
+WSL2 moet nog worden getest; de automatische GUI- en CPU-tests vervangen die
+installatieproef niet. Zie [de instructies](gaitdynamics.md).
 
 De app alleen bekijken vraagt geen Python-installatie: open
 `HuCalib\HuCalib.exe`. Je ziet **Windows-testbuild** in de venstertitel.

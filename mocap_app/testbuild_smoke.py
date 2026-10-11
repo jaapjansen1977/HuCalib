@@ -13,6 +13,9 @@ from mocap_app.core.updater import updates_supported
 from mocap_app.ui.designed_main_window import DesignedMainWindow
 from mocap_app.ui.analysis_dialog import MotionResultsDialog
 from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
+from mocap_app.ui.gaitdynamics_setup_dialog import GaitDynamicsSetupDialog
+from mocap_app.ui.gaitdynamics_run_dialog import GaitDynamicsRunDialog
+from mocap_app.analysis.gaitdynamics_wsl import payload_files, payload_id
 
 
 def run_smoke(report_path: str) -> int:
@@ -52,6 +55,9 @@ def run_smoke(report_path: str) -> int:
                                else Path(__file__).resolve().parents[1])
                     assert (runtime / 'mocap_app/analysis/pose2sim_worker.py').is_file()
                     assert (runtime / 'mocap_app/analysis/model_conversion.py').is_file()
+                    assert len(payload_id()) == 64
+                    assert all(path.is_file() for path in payload_files()[1:])
+                    assert hasattr(window, 'actionInstallGaitDynamics')
                     sample = root / 'example.mot'
                     sample.write_text('nRows=2\nnColumns=2\ninDegrees=yes\nendheader\ntime knee_angle_r\n0 10\n.1 20\n')
                     view = MotionResultsDialog(sample, dialog)
@@ -75,11 +81,30 @@ def run_smoke(report_path: str) -> int:
                             position = button.mapTo(gait, QPoint(0, 0))
                             assert gait.rect().contains(position + button.rect().bottomRight())
                     gait.close()
+                    for view, buttons in (
+                        (GaitDynamicsSetupDialog(dialog), ('check', 'install', 'close_button')),
+                        (GaitDynamicsRunDialog(sample, sample_model, dialog),
+                         ('install_button', 'start_button', 'view_button', 'folder_button', 'close_button'))):
+                        view.show()
+                        for point_size in (10, 15):
+                            font = view.font()
+                            font.setPointSize(point_size)
+                            view.setFont(font)
+                            view.resize(640, 480)
+                            app.processEvents()
+                            assert view.width() <= 640 and view.height() <= 480
+                            for name in buttons:
+                                button = getattr(view, name)
+                                position = button.mapTo(view, QPoint(0, 0))
+                                assert view.rect().contains(position + button.rect().bottomRight())
+                        view.close()
                     result.update(status='passed', analysis_dialog_opens=True,
                                   analysis_runtime_present=True, automatic_updates_disabled=True, graph_viewer_opens=True,
                                   small_screen_actions_visible=True, product_name='HU3D kinematics',
                                   gaitdynamics_input_dialog_opens=True, model_conversion_runtime_present=True,
-                                  model_conversion_controls_fit_small_screen=True)
+                                  model_conversion_controls_fit_small_screen=True,
+                                  wsl_setup_payload_present=True, wsl_dialogs_fit_small_screen=True,
+                                  wsl_installed_during_smoke=False)
                 except Exception as error:
                     result.update(status='failed', error=repr(error))
                 finally:

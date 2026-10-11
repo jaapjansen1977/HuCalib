@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import QProcess, QProcessEnvironment, QSize
 from PySide6.QtWidgets import (QDialog, QFileDialog, QFormLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QVBoxLayout)
+    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QVBoxLayout, QGridLayout)
 
 from mocap_app.analysis.gaitdynamics import inspect_inputs
 from mocap_app.core.branding import APP_NAME
@@ -51,17 +51,20 @@ class GaitDynamicsDialog(QDialog):
         self.details.setReadOnly(True)
         self.details.setPlaceholderText('De controle verandert geen opname, model of analyseresultaat.')
         layout.addWidget(self.details, 1)
-        actions = QHBoxLayout()
+        actions = QGridLayout()
         self.check_button = QPushButton('Invoer controleren')
         self.save_button = QPushButton('Rapport bewaren')
         self.close_button = close = QPushButton('Sluiten')
-        for button in (self.check_button, self.save_button, close):
-            actions.addWidget(button)
+        self.force_button = QPushButton('Krachten voorspellen…')
+        self.run_dialog = None
+        for i, button in enumerate((self.check_button, self.save_button, self.force_button, close)):
+            actions.addWidget(button, i // 2, i % 2)
         layout.addLayout(actions)
         self.save_button.setEnabled(False)
         self.check_button.clicked.connect(self._check)
         self.convert_button.clicked.connect(self._convert)
         self.save_button.clicked.connect(self._save)
+        self.force_button.clicked.connect(self._forces)
         close.clicked.connect(self.close)
         self.motion.textChanged.connect(self._invalidate)
         self.model.textChanged.connect(self._invalidate)
@@ -100,6 +103,23 @@ class GaitDynamicsDialog(QDialog):
         self.close_button.setEnabled(not busy)
         self.convert_button.setEnabled(not busy and all(field.text().strip() for field in (self.motion, self.model, self.python)))
         self.save_button.setEnabled(not busy and self.report is not None)
+        self.force_button.setEnabled(not busy)
+
+    @property
+    def busy(self):
+        return (self.process.state() != QProcess.ProcessState.NotRunning or
+                (self.run_dialog is not None and self.run_dialog.busy))
+
+    def _forces(self):
+        if self.busy:
+            return
+        self._check()
+        if not self.report or not self.report['compatible']:
+            self.details.appendPlainText('Converteer eerst het Pose2Sim-model en controleer de invoer.')
+            return
+        from mocap_app.ui.gaitdynamics_run_dialog import GaitDynamicsRunDialog
+        self.run_dialog = GaitDynamicsRunDialog(Path(self.motion.text()), Path(self.model.text()), self)
+        self.run_dialog.exec()
 
     def _convert(self):
         if self.process.state() != QProcess.ProcessState.NotRunning:
@@ -157,11 +177,15 @@ class GaitDynamicsDialog(QDialog):
             self.details.setPlainText('Modelconversie niet geslaagd: ' + str(error) + f'\nUitvoermap: {self.conversion_output}')
 
     def closeEvent(self, event):
-        if self.process.state() != QProcess.ProcessState.NotRunning:
-            self.details.appendPlainText('Wacht tot de modelconversie is afgerond voordat je dit venster sluit.')
+        if self.busy:
+            self.details.appendPlainText('Wacht tot de conversie, installatie of krachtberekening is afgerond voordat je dit venster sluit.')
             event.ignore()
         else:
             super().closeEvent(event)
+
+    def reject(self):
+        if not self.busy:
+            super().reject()
 
     def _check(self):
         try:

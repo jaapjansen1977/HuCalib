@@ -22,6 +22,10 @@ LABELS = {
 
 
 def coordinate_label(name: str) -> str:
+    force = re.fullmatch(r'force([12])_v([xyz])', name)
+    if force:
+        axis = {'x': 'X', 'y': 'Y (verticaal)', 'z': 'Z'}[force[2]]
+        return f'Grondreactiekracht {"rechts" if force[1] == "1" else "links"} — {axis}'
     side = ' links' if name.endswith('_l') else ' rechts' if name.endswith('_r') else ''
     base = name[:-2] if side else name
     if base in LABELS:
@@ -51,6 +55,12 @@ class MotionResult:
                    summary['in_degrees'])
 
     def unit(self, name: str) -> str:
+        if re.fullmatch(r'force[12]_v[xyz]', name):
+            return 'N'
+        if re.fullmatch(r'force[12]_p[xyz]', name):
+            return 'meter'
+        if re.fullmatch(r'torque[12]_[xyz]', name):
+            return 'N·m'
         if name in ('pelvis_tx', 'pelvis_ty', 'pelvis_tz', 'Abs_t1', 'Abs_t2'):
             return 'meter'
         return 'graden' if self.in_degrees else 'radialen'

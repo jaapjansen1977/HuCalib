@@ -4447,7 +4447,19 @@ class DesignedMainWindow(FunctionalMainWindow, Ui_MainWindow):
         self.actionAnalyzeRecording = QtGui.QAction('Bewegingsanalyse…', self)
         self.actionAnalyzeRecording.triggered.connect(self._on_open_analysis)
         self.menuAnalysis.addAction(self.actionAnalyzeRecording)
+        self.actionInstallGaitDynamics = QtGui.QAction('GaitDynamics installeren…', self)
+        self.actionInstallGaitDynamics.triggered.connect(self._open_gaitdynamics_setup)
+        self.menuAnalysis.addAction(self.actionInstallGaitDynamics)
         self.menuBar.insertMenu(self.menuHelp.menuAction(), self.menuAnalysis)
+
+    def _open_gaitdynamics_setup(self):
+        from mocap_app.ui.gaitdynamics_setup_dialog import GaitDynamicsSetupDialog
+        existing = getattr(self, '_gait_setup_dialog', None)
+        if existing is not None and existing.busy:
+            existing.raise_()
+            return
+        self._gait_setup_dialog = GaitDynamicsSetupDialog(self)
+        self._gait_setup_dialog.exec()
 
     def _designed_status_bar(self):
         """Return the status bar, calling it when ``statusBar`` is a method."""

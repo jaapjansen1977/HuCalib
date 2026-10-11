@@ -79,14 +79,14 @@ class CoordinatePlot(QWidget):
 
 
 class MotionResultsDialog(QDialog):
-    def __init__(self, path: Path, parent=None):
+    def __init__(self, path: Path, parent=None, forces=False):
         super().__init__(parent)
         self.result = MotionResult.read(path)
-        self.setWindowTitle(f'Bewegingsresultaten — {APP_NAME}')
+        self.setWindowTitle(f'{"Grondreactiekrachten" if forces else "Bewegingsresultaten"} — {APP_NAME}')
         self.setMinimumSize(420, 340)
         self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
         layout = QVBoxLayout(self)
-        title = QLabel('Gewrichtshoeken en verplaatsingen')
+        title = QLabel('Voorspelde grondreactiekrachten' if forces else 'Gewrichtshoeken en verplaatsingen')
         title.setWordWrap(True)
         title.setStyleSheet('font-size: 22px; font-weight: bold; color: #172b44;')
         layout.addWidget(title)
@@ -96,16 +96,20 @@ class MotionResultsDialog(QDialog):
         self.coordinate.setMinimumContentsLength(12)
         self.coordinate.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         for name in self.result.names:
+            if forces and name not in ('force1_vx', 'force1_vy', 'force1_vz', 'force2_vx', 'force2_vy', 'force2_vz'):
+                continue
             self.coordinate.addItem(coordinate_label(name), name)
         layout.addWidget(self.coordinate)
         self.plot = CoordinatePlot()
         layout.addWidget(self.plot, 1)
-        note = QLabel('Berekende modelcoördinaten. De meetnauwkeurigheid is niet gevalideerd.\n'
+        note = QLabel('Voorspelde krachten in newton; Y is verticaal in het OpenSim-coördinatenstelsel.\n'
+                      'De voorspelling is geen krachtplaatmeting en is niet klinisch gevalideerd.' if forces else
+                      'Berekende modelcoördinaten. De meetnauwkeurigheid is niet gevalideerd.\n'
                       'Gekoppelde coördinaten zijn geen onafhankelijke metingen.')
         note.setWordWrap(True)
         layout.addWidget(note)
         self.coordinate.currentIndexChanged.connect(self._update_plot)
-        preferred = self.coordinate.findData('knee_angle_r')
+        preferred = self.coordinate.findData('force1_vy' if forces else 'knee_angle_r')
         self.coordinate.setCurrentIndex(max(0, preferred))
         self._update_plot()
         self.setStyleSheet('QDialog { background: #f4f7fb; } QComboBox { padding: 8px; }')
@@ -262,7 +266,7 @@ class AnalysisDialog(QDialog):
     @property
     def busy(self):
         gait = getattr(self, '_gaitdynamics_dialog', None)
-        converting = gait is not None and gait.process.state() != QProcess.ProcessState.NotRunning
+        converting = gait is not None and gait.busy
         return self.process.state() != QProcess.ProcessState.NotRunning or self.phase in ('checking', 'running') or converting
 
     def _path_row(self, form, label, value, kind):

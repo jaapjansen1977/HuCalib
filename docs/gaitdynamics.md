@@ -12,7 +12,73 @@ voor beide voeten, met de officiële refinement-gewichten op CPU. Ze draait
 apart op Linux. Voor lokaal gebruik op een Windows-computer is **WSL2** de
 beoogde route: dat is een Linux-omgeving op dezelfde computer. Native Windows
 wordt niet ondersteund, omdat nimblephysics geen Windows-wheels publiceert.
-De WSL2-koppeling is nog niet automatisch vanuit het Windows-venster gestart.
+De Windows-app biedt nu een begeleide WSL2-installatie en start de
+krachtberekening vanuit het venster. De daadwerkelijke rekenmodule blijft
+binnen WSL2 draaien; je hoeft daarvoor geen Linux-opdrachten in te voeren.
+
+## Installeren en gebruiken op Windows
+
+1. Pak de **nieuwe** Windows-testbuild uit in een korte lokale map, bijvoorbeeld
+   `C:\HU3D`. Een eerdere testbuild bevat deze knoppen nog niet.
+2. Open `Installeer-GaitDynamics.cmd`, of kies in de app
+   **Analyse → GaitDynamics installeren…**. Klik op **Controleren** en daarna
+   **Installeren / doorgaan**. Dit is optioneel; Pose2Sim werkt ook zonder WSL2.
+3. Accepteer de Windows-beheerderstoestemming als die verschijnt. De app roept
+   Microsofts `wsl --install --no-distribution` aan voor de Windows-onderdelen.
+   Herstart Windows als de installatie daarom vraagt. Open daarna hetzelfde
+   installatievenster en klik opnieuw op **Installeren / doorgaan**.
+   De app controleert wat al aanwezig is en bewaart de installatiestatus.
+   Ubuntu 24.04 wordt daarna zonder interactieve eerste start onder jouw
+   gewone Windows-account geïnstalleerd, met expliciet WSL-versie 2.
+4. Wacht tot **GaitDynamics is gereed** verschijnt. De app installeert een
+   afzonderlijke Python 3.12-omgeving, CPU-PyTorch en nimblephysics binnen
+   Ubuntu. Beide AI-modellen worden met vastgelegde SHA256-hashes gecontroleerd.
+   Bestaande correcte downloads worden hergebruikt na een onderbreking.
+5. Na je Pose2Sim-analyse: **GaitDynamics voorbereiden → Pose2Sim-model
+   converteren… → Krachten voorspellen…**. Vul de werkelijke lichaamslengte
+   in meters en massa in kg in. Bandsnelheid is **0** bij wandelen over de grond.
+   Kies een map voor nieuwe resultaten; bestaande resultaten worden niet overschreven.
+6. Klik na afloop op **Krachten bekijken** voor de zes krachtcomponenten van
+   beide voeten, of **Resultaatmap openen**. `ground_reaction_forces.mot` bevat
+   krachten (N) en aangrijpingspunten (m); `gaitdynamics.json`,
+   `environment.json` en `windows-transport.json` leggen invoer en verwerking vast.
+   Vrije momenten worden niet voorspeld; de upstream torque-kolommen bevatten nullen.
+
+Er is geen handmatige Linux-accountregistratie nodig: de app gebruikt een
+afzonderlijke systeemgebruiker `hu3d-gait`, uitsluitend via `wsl --exec`.
+De rekenomgeving staat onder `/opt/hu3d-gaitdynamics`. Een al aanwezige
+**Ubuntu 24.04 met WSL2** wordt gebruikt; daarin voegt de app systeempakketten
+toe. Andere distributies en bestaande Python-omgevingen blijven behouden.
+Een bestaande Ubuntu 24.04 met WSL1 wordt niet automatisch omgezet.
+De draagbare testbuild heeft geen installatieprogramma dat WSL2 stilzwijgend
+installeert: je start de expliciete wizard vanuit de app of via het CMD-bestand.
+
+### Vereisten, fouten en testgrenzen
+
+Windows 10/11 x64 moet WSL2 ondersteunen, met hardwarevirtualisatie ingeschakeld.
+Reserveer 10 GB schijfruimte. Voor de eerste installatie is internet nodig naar
+Microsoft/Ubuntu, PyPI, `download.pytorch.org`, `raw.githubusercontent.com` en
+`media.githubusercontent.com`. Een beheerder of bedrijfsbeleid kan installatie
+blokkeren. Zonder toestemming wordt geen succesvolle installatie gemeld.
+De app herstart Windows niet automatisch en verwijdert geen distributies.
+Gebruik lokale bestanden; UNC-netwerkpaden worden afgewezen.
+
+Installatie- en transportfouten staan in
+`%LOCALAPPDATA%\HU3D-kinematics\GaitDynamics\setup.log`.
+Als de rekenmodule is gestart, staan uitgebreidere foutdetails in de gekozen
+resultaatmap in `gaitdynamics.log` en `gaitdynamics.json`.
+Bij virtualisatie-, kernel- of WSL-installatiefouten:
+[Microsofts WSL-installatiehandleiding](https://learn.microsoft.com/windows/wsl/install)
+en [probleemoplossing](https://learn.microsoft.com/windows/wsl/troubleshooting).
+
+De installatiebeslissingen, herstartstatus, geweigerde toestemming,
+downloadcontrole, bestandspaden en GUI worden automatisch getest.
+De adapter en rekenpayload worden ook op Linux met **echte CPU-voorspelling**
+getest, met een nagebootste WSL-opdrachtlaag. Dat bewijst geen werkende
+WSL2-installatie op Windows. Het werkelijk installeren/booten van WSL2,
+beheerderstoestemming, herstart en toegang tot Windows-mappen moeten nog op
+een echte Windows-computer worden beproefd. Daarvoor zijn geen webcams of
+Charuco-board nodig. De voorspelde krachten zijn niet klinisch gevalideerd.
 
 ## Een Pose2Sim-resultaat converteren
 

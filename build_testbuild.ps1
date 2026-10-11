@@ -48,6 +48,7 @@ try {
     New-Item -ItemType Directory -Path $kit | Out-Null
     Copy-Item -Recurse -Path $appDir -Destination (Join-Path $kit 'HuCalib')
     Copy-Item setup_analysis.ps1, requirements-pose2sim.txt -Destination $kit
+    Copy-Item Installeer-GaitDynamics.cmd -Destination $kit
     Copy-Item docs\windows_testbuild.md -Destination (Join-Path $kit 'LEESMIJ-WINDOWS.md')
     Copy-Item docs\gaitdynamics.md -Destination $kit
     Copy-Item $smokeReport -Destination $kit

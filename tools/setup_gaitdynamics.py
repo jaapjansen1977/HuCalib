@@ -9,11 +9,17 @@ from mocap_app.analysis.gaitdynamics import UPSTREAM_COMMIT, SOURCE_SHA256, MODE
 
 
 def setup(output: Path):
-    output.mkdir(parents=True, exist_ok=False)
+    output.mkdir(parents=True, exist_ok=True)
     files = {'gait_dynamics.py': (SOURCE_SHA256, 'raw', 'example_usage/gait_dynamics.py'),
              'LICENSE': ('6bc1614dbbe8f8254d7176a27f43f9633f678672bf4f4cd97f468354d02189d6', 'raw', 'LICENSE')}
     files.update({name: (checksum, 'media', 'example_usage/' + name) for name, checksum in MODEL_HASHES.items()})
     for name, (checksum, host, remote) in files.items():
+        existing = output / name
+        if existing.exists():
+            if sha256(existing) != checksum:
+                raise ValueError(f'Bestaand bestand heeft een onjuiste checksum: {name}. Verplaats dit bestand en probeer opnieuw.')
+            print(f'{name}: reeds aanwezig, checksum gecontroleerd', flush=True)
+            continue
         url = (f'https://raw.githubusercontent.com/stanfordnmbl/GaitDynamics/{UPSTREAM_COMMIT}/{remote}'
                if host == 'raw' else f'https://media.githubusercontent.com/media/stanfordnmbl/GaitDynamics/{UPSTREAM_COMMIT}/{remote}')
         temporary = output / (name + '.download')
