@@ -79,6 +79,14 @@ geen kniebelastingen of gewrichtsmomenten berekend in deze eerste koppeling.
 
 ## Proef en beperkingen
 
+De [echte CPU-proef op GitHub Actions](https://github.com/jaapjansen1977/HuCalib/actions/runs/38133031633)
+is geslaagd op 11 oktober 2026, voor appcommit
+`f6482e858e3ea2695ab15a77adaa0ef536d08c28`: 499 regels met eindige waarden
+en 19 kolommen, met de officiële refinement-gewichten. De Windows-app heeft
+66 unit-tests; de Windows-build controleert ook het nieuwe invoervenster.
+
+![Invoercontrole van de officiële GaitDynamics-demo, na de gedocumenteerde headercorrectie](examples/gaitdynamics-controle.png)
+
 De workflow **GaitDynamics-CPU-proef** draait de officiële voorbeeldbeweging
 met volledige kinematica. De voorbeeldbestanden komen uit de officiële
 Hugging Face-demo op commit `c905e7af6f7a32e8cc99f413ff6559dd897a91b5`.
