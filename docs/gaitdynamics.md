@@ -139,6 +139,26 @@ geen kniebelastingen of gewrichtsmomenten berekend in deze eerste koppeling.
 
 ## Proef en beperkingen
 
+### Tijdverwerking voor krachtvoorspelling
+
+GaitDynamics verwacht 100 Hz. De afzonderlijke worker maakt daarvoor een
+nieuw rekenbestand door de werkelijke invoertijden te interpoleren naar een
+100 Hz-raster. De originele beweging en de conversie blijven ongewijzigd.
+Een opname van 60 of 59,94 Hz krijgt hierdoor meer rekenregels, geen extra
+gemeten frames. De uitvoer stopt binnen het oorspronkelijke tijdsinterval;
+er wordt niet geëxtrapoleerd. Hoekovergangen tussen -180 en +180 graden
+worden vóór interpolatie continu gemaakt.
+
+De upstream rondt de oorspronkelijke camera-FPS af voordat hij interpoleert.
+Deze adapter voorkomt de daardoor mogelijke tijdsdrift door de interpolatie
+zelf op de echte tijdstippen uit te voeren. `environment.json` bevat onder
+`preprocessing` de bron- en uitvoeraantallen, tijdsintervallen, bronfrequentie
+en checksums. De uitvoertijden en alle 100 Hz-rekenposes worden gecontroleerd.
+De upstream rondt de geëxporteerde tijden af op vijf decimalen; de adapter
+verifieert die afronding expliciet.
+
+### Officiële GaitDynamics-demo
+
 De [echte CPU-proef op GitHub Actions](https://github.com/jaapjansen1977/HuCalib/actions/runs/38133031633)
 is geslaagd op 11 oktober 2026, voor appcommit
 `f6482e858e3ea2695ab15a77adaa0ef536d08c28`: 499 regels met eindige waarden

@@ -1,5 +1,6 @@
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -58,6 +59,26 @@ class AnalysisUiTests(unittest.TestCase):
         self.dialog.closeEvent(event)
         self.assertFalse(event.isAccepted())
         self.dialog.phase = 'idle'
+
+    def test_active_model_conversion_keeps_parent_open_and_prevents_duplicate_worker(self):
+        from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
+        gait = GaitDynamicsDialog(None, None, self.dialog)
+        self.dialog._gaitdynamics_dialog = gait
+        gait.process.start(sys.executable, ['-c', 'import time; time.sleep(10)'])
+        try:
+            self.assertTrue(gait.process.waitForStarted(5000))
+            self.assertTrue(self.dialog.busy)
+            event = QCloseEvent()
+            self.dialog.closeEvent(event)
+            self.assertFalse(event.isAccepted())
+            self.dialog.report = {'status': 'completed'}
+            self.dialog.output_dir = self.root
+            self.dialog._open_gaitdynamics()
+            self.assertIs(self.dialog._gaitdynamics_dialog, gait)
+        finally:
+            gait.process.kill()
+            gait.process.waitForFinished(5000)
+        self.assertFalse(self.dialog.busy)
 
     def test_small_windows_keep_all_actions_visible_while_content_scrolls(self):
         self.dialog.show()
