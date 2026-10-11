@@ -9,6 +9,59 @@ import sys
 from mocap_app.analysis.gaitdynamics import COORDINATES, read_motion, verify_runtime
 
 
+def validate_kinematics(namespace, skeleton, motion, reference=None):
+    """Check axes, topology and the upstream polynomial FK approximations.
+
+    Same coordinate names alone are not enough. This gate runs for every model,
+    including externally supplied 23-coordinate models, before AI inference.
+    """
+    import numpy as np
+    import torch
+    from scipy.spatial.transform import Rotation
+    pelvis = skeleton.getBodyNode('pelvis')
+    if [pelvis.getChildJoint(i).getChildBodyNode().getName()
+            for i in range(pelvis.getNumChildJoints())] != ['femur_r', 'femur_l', 'torso']:
+        raise RuntimeError('Onverwachte bekken-topologie voor GaitDynamics.')
+    names, rows, header = read_motion(motion)
+    q = np.array([[row[names.index(name)] for name in COORDINATES] for row in rows])
+    if header['inDegrees'] == 'yes':
+        q[:, [i for i in range(23) if i not in (3, 4, 5)]] *= np.pi / 180
+    with torch.no_grad():
+        feet, _, _, rotations = namespace['forward_kinematics'](
+            torch.tensor(q, dtype=torch.float32), namespace['get_model_offsets'](skeleton).float())
+    feet, rotations = feet[:, 0].numpy(), rotations[:, 0].numpy()
+    bodies = ('pelvis', 'femur_r', 'tibia_r', 'talus_r', 'calcn_r',
+              'femur_l', 'tibia_l', 'talus_l', 'calcn_l', 'torso')
+    max_foot, max_angle, max_reference_position, max_reference_angle = 0., 0., 0., 0.
+    expected = json.loads(reference.read_text()) if reference is not None else None
+    if expected and (expected['bodies'] != list(bodies) or expected['times'] != [row[0] for row in rows]):
+        raise RuntimeError('Conversiereferentie hoort niet bij deze beweging.')
+    for i, values in enumerate(q):
+        skeleton.setPositions(values)
+        for j, name in enumerate(bodies):
+            transform = skeleton.getBodyNode(name).getWorldTransform()
+            r, p = transform.rotation(), transform.translation()
+            max_angle = max(max_angle, float(Rotation.from_matrix(r.T @ rotations[j, i]).magnitude()))
+            if name in ('calcn_r', 'calcn_l'):
+                max_foot = max(max_foot, float(np.linalg.norm(p - feet[0 if name.endswith('_r') else 2, i])))
+            if expected:
+                max_reference_position = max(max_reference_position,
+                    float(np.linalg.norm(p - np.array(expected['positions_m'][i][j]))))
+                max_reference_angle = max(max_reference_angle, float(Rotation.from_matrix(
+                    np.array(expected['orientations'][i][j]).T @ r).magnitude()))
+    result = {'checked_frames': len(rows), 'upstream_max_foot_position_error_m': max_foot,
+        'upstream_max_body_orientation_error_degrees': max_angle * 180 / np.pi,
+        'upstream_limits': {'position_m': .015, 'orientation_degrees': 5},
+        'conversion_reference_checked': expected is not None,
+        'opensim_nimble_max_position_error_m': max_reference_position if expected else None,
+        'opensim_nimble_max_orientation_error_rad': max_reference_angle if expected else None}
+    if max_foot > .015 or max_angle > np.deg2rad(5):
+        raise RuntimeError('GaitDynamics-gewrichtsassen of voetkinematica wijken te veel af: ' + json.dumps(result))
+    if expected and (max_reference_position > 1e-5 or max_reference_angle > 1e-5):
+        raise RuntimeError('OpenSim en nimblephysics interpreteren het geconverteerde model verschillend: ' + json.dumps(result))
+    return result
+
+
 def main():
     if sys.platform != 'linux':
         raise RuntimeError('Deze GaitDynamics-runtime vereist Linux of WSL2; native Windows wordt niet ondersteund.')
@@ -65,6 +118,10 @@ def main():
     dofs = [dof.getName() for dof in skeleton.getDofs()]
     if dofs != list(COORDINATES):
         raise RuntimeError('De onafhankelijke modelcoördinaten of hun volgorde zijn niet GaitDynamics-compatibel: ' + str(dofs))
+    reference = output / 'inputs/kinematics-reference.json'
+    kinematics_check = validate_kinematics(namespace, skeleton, output / 'inputs/motion.mot',
+                                         reference if reference.is_file() else None)
+    (output / 'kinematics-check.json').write_text(json.dumps(kinematics_check, indent=2), encoding='utf-8')
     namespace['opt'] = opt
     os.chdir(output / 'inputs')
     with torch.no_grad():
@@ -83,6 +140,7 @@ def main():
         'numpy': version('numpy'), 'pandas': version('pandas'), 'scipy': version('scipy'),
         'upstream_original_column_header': original_columns,
         'visual_meshes_removed_for_numerical_inference': True,
+        'kinematics_check': kinematics_check,
     }, indent=2), encoding='utf-8')
 
 

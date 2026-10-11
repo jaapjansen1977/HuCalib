@@ -142,6 +142,17 @@ def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python:
             shutil.copy2(original, target)
             if sha256(original) != sha256(target):
                 raise GaitDynamicsError('De invoer is gewijzigd tijdens het kopiëren.')
+        conversion_path = motion.parent / 'conversion.json'
+        if conversion_path.is_file():
+            conversion = json.loads(conversion_path.read_text(encoding='utf-8'))
+            reference = motion.parent / 'kinematics-reference.json'
+            artifacts = conversion.get('artifacts', {})
+            if conversion.get('status') != 'completed' or any(
+                    artifacts.get(path.name) != sha256(path) for path in (motion, model, reference)):
+                raise GaitDynamicsError('Conversierapport en invoer horen niet aantoonbaar bij elkaar.')
+            shutil.copy2(reference, inputs / reference.name)
+            report['conversion'] = conversion
+            report['warnings'].extend(conversion['warnings'])
         report['input_sha256'] = {p.name: sha256(p) for p in inputs.iterdir()}
         report['model_sha256'] = {name: sha256(runtime / name) for name in MODEL_HASHES}
         report['status'] = 'running'

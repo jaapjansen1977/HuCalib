@@ -1,0 +1,76 @@
+name: Pose2Sim-modelconversie-en-CPU-proef
+
+on:
+  push:
+    branches: [feat/recording-session-metadata]
+    paths:
+      - '.github/workflows/pose2sim-gaitdynamics.yml'
+      - 'mocap_app/analysis/model_conversion.py'
+      - 'mocap_app/analysis/gaitdynamics*.py'
+      - 'tools/smoke_pose2sim_gaitdynamics.py'
+      - 'tests/test_model_conversion_integration.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-conversion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      MPLBACKEND: Agg
+      CUDA_VISIBLE_DEVICES: ''
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Twee gescheiden rekenomgevingen
+        run: |
+          python -m venv .venv-pose
+          .venv-pose/bin/python -m pip install -r requirements-pose2sim.txt
+          python -m venv .venv-gait
+          .venv-gait/bin/python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          .venv-gait/bin/python -m pip install -r requirements-gaitdynamics.txt
+      - name: Geometrische conversie- en afwijzingsproeven
+        run: .venv-pose/bin/python -m unittest discover -s tests -p test_model_conversion_integration.py -v
+      - name: Officiële video's en GaitDynamics-modellen
+        run: |
+          .venv-pose/bin/python tools/prepare_windows_demo.py --output Demo
+          .venv-gait/bin/python tools/setup_gaitdynamics.py --output gait-runtime
+      - name: Volledige bewegingsanalyse en krachtvoorspelling
+        run: .venv-pose/bin/python tools/smoke_pose2sim_gaitdynamics.py --demo Demo --output model-validation --runtime gait-runtime --gait-python .venv-gait/bin/python
+      - name: Resultaat of laatste fout publiceren
+        if: always()
+        env:
+          TEST_FAILED: ${{ job.status == 'failure' }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path('model-validation')
+          paths = [root / 'validation.json', root / 'conversion/conversion.json', root / 'gaitdynamics/gaitdynamics.log']
+          paths += sorted((root / 'pose2sim').glob('*.log'), key=lambda p: p.stat().st_mtime)[-1:]
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              for p in paths:
+                  if p.exists():
+                      value = p.read_text(errors='replace')[-2300:]
+                      summary.write(f'### {p}\n```text\n{value}\n```\n')
+                      if os.environ['TEST_FAILED'] == 'true':
+                          value = value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                          print(f'::error title=Modelconversie {p.name}::{value}')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Pose2Sim-GaitDynamics-result-${{ github.sha }}
+          path: |
+            model-validation/validation.json
+            model-validation/conversion/
+            model-validation/gaitdynamics/
+            model-validation/pose2sim/analysis.json
+            model-validation/pose2sim/*.log
+          if-no-files-found: ignore
+          retention-days: 14
