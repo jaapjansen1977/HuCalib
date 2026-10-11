@@ -143,6 +143,7 @@ class AnalysisUiTests(unittest.TestCase):
         self.dialog._process_finished(0, QProcess.ExitStatus.NormalExit)
         self.assertTrue(self.dialog.folder_button.isEnabled())
         self.assertTrue(self.dialog.graph_button.isEnabled())
+        self.assertTrue(self.dialog.gait_button.isEnabled())
         self.assertIn('62 modelcoördinaten', self.dialog.summary.text())
 
 

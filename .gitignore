@@ -24,6 +24,9 @@ dist-testbuild/
 .build-testbuild/
 .venv-testbuild/
 .venv-pose2sim/
+.venv-gaitdynamics/
+gait-runtime/
+gait-validation/
 
 # Velopack release output (installer + update packages)
 Releases/

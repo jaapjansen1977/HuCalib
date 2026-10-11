@@ -31,6 +31,7 @@ a = Analysis(
     # modules (and other libs PyInstaller pulls in by default) to shrink the exe.
     excludes=[
         'Pose2Sim', 'opensim', 'rtmlib', 'onnxruntime', 'rtoml',
+        'nimblephysics', 'accelerate',
         'tkinter',
         'matplotlib',
         # Heavy scientific libs that get pulled in transitively but are unused

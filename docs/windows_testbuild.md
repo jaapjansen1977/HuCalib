@@ -63,7 +63,7 @@ Controleer bij deze build ook het volgende, zonder webcams of ChArUco-bord:
 - Het hoofdvenster, analysevenster en de grafieken vermelden **HU3D kinematics**.
 - Het analysevenster opent binnen de beschikbare schermruimte. Verklein het
   venster: de inhoud scrolt, de actieknoppen, status en voortgang blijven staan.
-- Ook bij je normale Windows-schermschaal blijven alle vijf knoppen bereikbaar.
+- Ook bij je normale Windows-schermschaal blijven alle actieknoppen bereikbaar.
 - Het hoofdvenster heeft scrollbare pagina's en navigatie; de grafiek schaalt
   mee wanneer je het resultatenvenster kleiner maakt.
 
@@ -180,7 +180,8 @@ Bij een fout: bewaar ook de staplog en een screenshot van de melding. Noteer
 Windows-versie en Python-versie. Er hoeven geen AI-modellen naar GitHub.
 
 Webcamopname, reconnect-identiteit, kalibratie en timing volgen in een aparte
-praktijktest. GaitDynamics zit niet in deze testbuild.
+praktijktest. **GaitDynamics voorbereiden** controleert de invoer; de
+afzonderlijke rekenmodule vereist Linux/WSL2. Zie [de GaitDynamics-koppeling](gaitdynamics.md).
 
 ## Voor de ontwikkelaar: lokaal bouwen
 

@@ -49,6 +49,7 @@ try {
     Copy-Item -Recurse -Path $appDir -Destination (Join-Path $kit 'HuCalib')
     Copy-Item setup_analysis.ps1, requirements-pose2sim.txt -Destination $kit
     Copy-Item docs\windows_testbuild.md -Destination (Join-Path $kit 'LEESMIJ-WINDOWS.md')
+    Copy-Item docs\gaitdynamics.md -Destination $kit
     Copy-Item $smokeReport -Destination $kit
     & $buildPython -m pip freeze | Out-File (Join-Path $kit 'build-dependencies.txt') -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw 'Dependencyversies vastleggen mislukt.' }

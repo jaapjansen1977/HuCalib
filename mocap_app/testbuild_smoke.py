@@ -12,6 +12,7 @@ from mocap_app.core.config import AppConfig
 from mocap_app.core.updater import updates_supported
 from mocap_app.ui.designed_main_window import DesignedMainWindow
 from mocap_app.ui.analysis_dialog import MotionResultsDialog
+from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
 
 
 def run_smoke(report_path: str) -> int:
@@ -58,9 +59,18 @@ def run_smoke(report_path: str) -> int:
                     app.processEvents()
                     assert view.coordinate.currentData() == 'knee_angle_r'
                     view.close()
+                    sample_model = root / 'example.osim'
+                    sample_model.write_text('<OpenSimDocument><Model><JointSet/></Model></OpenSimDocument>')
+                    gait = GaitDynamicsDialog(sample, sample_model, dialog)
+                    gait.show()
+                    gait._check()
+                    assert gait.report is not None and not gait.report['compatible']
+                    assert gait.save_button.isEnabled()
+                    gait.close()
                     result.update(status='passed', analysis_dialog_opens=True,
                                   analysis_runtime_present=True, automatic_updates_disabled=True, graph_viewer_opens=True,
-                                  small_screen_actions_visible=True, product_name='HU3D kinematics')
+                                  small_screen_actions_visible=True, product_name='HU3D kinematics',
+                                  gaitdynamics_input_dialog_opens=True)
                 except Exception as error:
                     result.update(status='failed', error=repr(error))
                 finally:

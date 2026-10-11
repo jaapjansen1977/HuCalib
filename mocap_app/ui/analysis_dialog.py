@@ -140,6 +140,7 @@ class AnalysisDialog(QDialog):
         self.checked = False
         self._buffer = ''
         self._results_dialog = None
+        self._gaitdynamics_dialog = None
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(12, 12, 12, 12)
         self.content_scroll = QScrollArea()
@@ -208,8 +209,9 @@ class AnalysisDialog(QDialog):
         self.start_button.setObjectName('startAnalysis')
         self.folder_button = QPushButton('Resultatenmap openen')
         self.graph_button = QPushButton('Grafieken bekijken')
+        self.gait_button = QPushButton('GaitDynamics voorbereiden')
         self.close_button = QPushButton('Sluiten')
-        self._action_buttons = (self.check_button, self.start_button, self.folder_button,
+        self._action_buttons = (self.check_button, self.start_button, self.gait_button, self.folder_button,
                                 self.graph_button, self.close_button)
         self._action_columns = None
         outer_layout.addLayout(self.actions)
@@ -218,6 +220,7 @@ class AnalysisDialog(QDialog):
         self.start_button.clicked.connect(self._start)
         self.folder_button.clicked.connect(self._open_folder)
         self.graph_button.clicked.connect(self._open_graph)
+        self.gait_button.clicked.connect(self._open_gaitdynamics)
         self.close_button.clicked.connect(self.close)
         for field in (self.session, self.output_base, self.python, self.config):
             field.textChanged.connect(self._invalidate)
@@ -246,10 +249,7 @@ class AnalysisDialog(QDialog):
             self.actions.takeAt(0)
         for index, button in enumerate(self._action_buttons):
             # Primary actions first, close at the bottom right.
-            if columns == 3:
-                row, col = ((0, index) if index < 2 else (1, index - 2))
-            else:
-                row, col = (divmod(index, 2) if index < 4 else (2, 1))
+            row, col = divmod(index, columns)
             self.actions.addWidget(button, row, col)
         for col in range(3):
             self.actions.setColumnStretch(col, 1 if col < columns else 0)
@@ -298,6 +298,7 @@ class AnalysisDialog(QDialog):
         self.close_button.setEnabled(not busy)
         self.folder_button.setEnabled(self.output_dir is not None and self.output_dir.is_dir())
         self.graph_button.setEnabled(not busy and bool(self.report and self.report.get('status') == 'completed'))
+        self.gait_button.setEnabled(self.graph_button.isEnabled())
 
     def _launch(self, arguments):
         root = (Path(sys._MEIPASS) / 'analysis_runtime' if getattr(sys, 'frozen', False)
@@ -452,6 +453,20 @@ class AnalysisDialog(QDialog):
             self._results_dialog.show()
         except (OSError, ValueError, KeyError) as error:
             self.messages.appendPlainText('Grafiek kan niet worden geopend: ' + str(error))
+
+    def _open_gaitdynamics(self):
+        if not self.report or self.report.get('status') != 'completed' or self.output_dir is None:
+            return
+        from mocap_app.ui.gaitdynamics_dialog import GaitDynamicsDialog
+        motions = [entry['path'] for entry in self.report.get('result_summary', []) if 'coordinates' in entry]
+        models = [entry['path'] for entry in self.report.get('artifacts', []) if entry['path'].lower().endswith('.osim')]
+        def candidate(paths):
+            if len(paths) != 1:
+                return None  # Let the user choose when there are multiple models/trials.
+            path = (self.output_dir / paths[0]).resolve()
+            return path if path.is_relative_to(self.output_dir.resolve()) else None
+        self._gaitdynamics_dialog = GaitDynamicsDialog(candidate(motions), candidate(models), self)
+        self._gaitdynamics_dialog.show()
 
     def closeEvent(self, event):
         if self.busy:

@@ -1,0 +1,207 @@
+"""Experimental GaitDynamics bridge; no torch/nimble imports in the GUI."""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import shutil
+import statistics
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+UPSTREAM_COMMIT = '8dc5aed58161a129fd2d58ff071cb802f2654be9'
+SOURCE_SHA256 = 'd7573e69b522b18f12a9703571989538697f98d72938160bd1a402118eb7c682'
+MODEL_HASHES = {
+    'GaitDynamicsRefinement.pt': '34a659ce485ea48eb11e1400dac53c46892e1487bcf347c16c529c463dd011fb',
+    'GaitDynamicsDiffusion.pt': '709f7229013313b512585c35a6457155be2a7ce650a7ad08d6e2d85c04c4a260',
+}
+COORDINATES = ('pelvis_tilt', 'pelvis_list', 'pelvis_rotation', 'pelvis_tx', 'pelvis_ty', 'pelvis_tz',
+    'hip_flexion_r', 'hip_adduction_r', 'hip_rotation_r', 'knee_angle_r', 'ankle_angle_r',
+    'subtalar_angle_r', 'mtp_angle_r', 'hip_flexion_l', 'hip_adduction_l', 'hip_rotation_l',
+    'knee_angle_l', 'ankle_angle_l', 'subtalar_angle_l', 'mtp_angle_l',
+    'lumbar_extension', 'lumbar_bending', 'lumbar_rotation')
+DEPENDENT_COORDINATES = {'knee_angle_r_beta', 'knee_angle_l_beta'}
+
+
+class GaitDynamicsError(ValueError):
+    pass
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_motion(path: Path) -> tuple[list[str], list[list[float]], dict]:
+    lines = path.read_text(encoding='utf-8-sig').splitlines()
+    try:
+        end = next(i for i, line in enumerate(lines) if line.strip() == 'endheader')
+    except StopIteration:
+        raise GaitDynamicsError('MOT-bestand mist endheader.') from None
+    header = {}
+    for line in lines[:end]:
+        if '=' in line:
+            key, value = line.split('=', 1)
+            header[key.strip()] = value.strip()
+    data = [line.split() for line in lines[end + 1:] if line.strip()]
+    if not data or data[0][0] != 'time':
+        raise GaitDynamicsError('MOT-bestand mist de tijdkolom.')
+    names = data[0]
+    if len(set(names)) != len(names):
+        raise GaitDynamicsError('MOT-bestand bevat dubbele kolommen.')
+    rows = [[float(value) for value in line] for line in data[1:]]
+    if len(rows) < 2 or any(len(row) != len(names) for row in rows):
+        raise GaitDynamicsError('MOT-bestand heeft onvoldoende of onvolledige meetregels.')
+    if not all(math.isfinite(value) for row in rows for value in row):
+        raise GaitDynamicsError('MOT-bestand bevat niet-eindige waarden.')
+    for key, count in (('nRows', len(rows)), ('nColumns', len(names))):
+        if key in header and int(header[key]) != count:
+            raise GaitDynamicsError(f'MOT-header {key} komt niet overeen met de meetgegevens.')
+    return names, rows, header
+
+
+def inspect_inputs(motion: Path, model: Path) -> dict:
+    """Conservative first bridge: full 23-coordinate gait model and kinematics."""
+    names, rows, header = read_motion(motion)
+    errors = []
+    if header.get('inDegrees') not in ('yes', 'no'):
+        errors.append('Hoekeenheden ontbreken: inDegrees moet yes of no zijn.')
+    deltas = [b[0] - a[0] for a, b in zip(rows, rows[1:])]
+    step = statistics.median(deltas)
+    if step <= 0 or any(delta <= 0 or abs(delta - step) > max(step * .01, 1e-5) for delta in deltas):
+        errors.append('Tijdstappen moeten oplopend en regelmatig zijn; framegaten zijn niet toegestaan.')
+    duration = rows[-1][0] - rows[0][0]
+    if duration < 1.52:
+        errors.append('GaitDynamics vereist minimaal 1,52 seconden aaneengesloten kinematica.')
+    missing = [name for name in COORDINATES if name not in names]
+    if missing:
+        errors.append('Ontbrekende GaitDynamics-coördinaten: ' + ', '.join(missing) +
+                      '. Rugsegmenten mogen niet zomaar worden hernoemd naar lumbar-coördinaten.')
+    tree = ET.parse(model)
+    coordinates = [element.get('name') for element in tree.findall('.//JointSet//Coordinate')]
+    missing_model = [name for name in COORDINATES if name not in coordinates]
+    extra_model = [name for name in coordinates if name not in COORDINATES and name not in DEPENDENT_COORDINATES]
+    bodies = {element.get('name') for element in tree.findall('.//BodySet/objects/Body')}
+    required_bodies = {'pelvis', 'femur_r', 'tibia_r', 'talus_r', 'calcn_r',
+                       'femur_l', 'tibia_l', 'talus_l', 'calcn_l', 'torso'}
+    if missing_model or extra_model or not required_bodies.issubset(bodies):
+        errors.append('Het OpenSim-model is geen ondersteund GaitDynamics-model met 23 onafhankelijke '
+                      'coördinaten. Het huidige Pose2Sim-model met een gesegmenteerde rug vereist eerst modelconversie.')
+    return {'schema_version': 1, 'compatible': not errors, 'errors': errors,
+            'motion': str(motion.absolute()), 'model': str(model.absolute()),
+            'rows': len(rows), 'duration_seconds': duration,
+            'sampling_rate': 1 / step if step > 0 else None,
+            'in_degrees': header.get('inDegrees'), 'missing_coordinates': missing,
+            'missing_model_coordinates': missing_model, 'extra_model_coordinates': extra_model,
+            'runtime': 'afzonderlijke Linux-omgeving of WSL2; nimblephysics heeft geen Windows-wheels',
+            'scientific_accuracy_validated': False}
+
+
+def verify_runtime(runtime: Path) -> None:
+    for name, expected in {'gait_dynamics.py': SOURCE_SHA256, **MODEL_HASHES}.items():
+        if not (runtime / name).is_file() or sha256(runtime / name) != expected:
+            raise GaitDynamicsError(f'Officieel runtimebestand ontbreekt of heeft een onjuiste checksum: {name}')
+
+
+def run_analysis(motion: Path, model: Path, output: Path, runtime: Path, python: Path,
+                 height_m: float, mass_kg: float, treadmill_speed: float, timeout=1800) -> dict:
+    motion, model, output, runtime = [path.expanduser().absolute() for path in (motion, model, output, runtime)]
+    checked = inspect_inputs(motion, model)
+    if not checked['compatible']:
+        raise GaitDynamicsError('\n'.join(checked['errors']))
+    if not all(math.isfinite(v) for v in (height_m, mass_kg, treadmill_speed)) or not (
+            1 <= height_m <= 2.5 and 30 <= mass_kg <= 200 and 0 <= treadmill_speed <= 10):
+        raise GaitDynamicsError('Vul lengte (1–2,5 m), massa (30–200 kg) en loopbandsnelheid (0–10 m/s) in.')
+    verify_runtime(runtime)
+    if motion.is_relative_to(output) or model.is_relative_to(output) or runtime.is_relative_to(output):
+        raise GaitDynamicsError('Kies een nieuwe uitvoermap buiten de invoer en runtime.')
+    output.mkdir(parents=True, exist_ok=False)
+    inputs = output / 'inputs'
+    inputs.mkdir()
+    report = {'schema_version': 1, 'status': 'preparing', 'upstream_commit': UPSTREAM_COMMIT,
+              'device': 'cpu', 'height_m': height_m, 'mass_kg': mass_kg,
+              'treadmill_speed_m_s': treadmill_speed, 'input_check': checked,
+              'created_at_utc': datetime.now(timezone.utc).isoformat(),
+              'scientific_accuracy_validated': False, 'generated_missing_kinematics': False,
+              'warnings': ['Dit zijn modelvoorspellingen, geen gemeten krachten.',
+                           'Vrije momenten zijn niet voorspeld; de upstream torque-kolommen bevatten nullen.']}
+    report_path = output / 'gaitdynamics.json'
+    def save():
+        report_path.write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
+    save()
+    try:
+        for original, target in ((motion, inputs / 'motion.mot'), (model, inputs / 'model.osim')):
+            shutil.copy2(original, target)
+            if sha256(original) != sha256(target):
+                raise GaitDynamicsError('De invoer is gewijzigd tijdens het kopiëren.')
+        report['input_sha256'] = {p.name: sha256(p) for p in inputs.iterdir()}
+        report['model_sha256'] = {name: sha256(runtime / name) for name in MODEL_HASHES}
+        report['status'] = 'running'
+        save()
+        environment = os.environ.copy()
+        environment.update(CUDA_VISIBLE_DEVICES='', ACCELERATE_USE_CPU='true', MPLBACKEND='Agg',
+                           PYTHONPATH=str(Path(__file__).resolve().parents[2]) + os.pathsep + environment.get('PYTHONPATH', ''))
+        with (output / 'gaitdynamics.log').open('w', encoding='utf-8') as log:
+            process = subprocess.run([str(python.expanduser().absolute()), '-m',
+                'mocap_app.analysis.gaitdynamics_worker', str(output), str(runtime)],
+                cwd=inputs, env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
+        if process.returncode:
+            raise GaitDynamicsError('GaitDynamics is mislukt; zie gaitdynamics.log.')
+        result = inputs / 'motion_grf_pred___.mot'
+        names, rows, _ = read_motion(result)
+        expected = ['time'] + [f'{prefix}{side}_{axis}' for side in (1, 2)
+            for prefix, axes in (('force', ('vx', 'vy', 'vz', 'px', 'py', 'pz')), ('torque', ('x', 'y', 'z')))
+            for axis in axes]
+        if names != expected:
+            raise GaitDynamicsError('GaitDynamics-resultaat heeft onverwachte kolommen.')
+        target = output / 'ground_reaction_forces.mot'
+        shutil.copy2(result, target)
+        report.update(status='completed', result={'path': target.name, 'sha256': sha256(target),
+            'rows': len(rows), 'force_unit': 'N', 'cop_unit': 'm', 'right_foot': 'force1', 'left_foot': 'force2'})
+        report['environment'] = json.loads((output / 'environment.json').read_text(encoding='utf-8'))
+    except Exception as error:
+        report.update(status='failed', error=f'{type(error).__name__}: {error}')
+        raise
+    finally:
+        report['finished_at_utc'] = datetime.now(timezone.utc).isoformat()
+        save()
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Experimentele GaitDynamics-koppeling op CPU')
+    for name in ('motion', 'model'):
+        parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--check-only', action='store_true')
+    for name in ('output', 'runtime', 'python'):
+        parser.add_argument('--' + name, type=Path)
+    parser.add_argument('--height', type=float)
+    parser.add_argument('--mass', type=float)
+    parser.add_argument('--treadmill-speed', type=float, default=0)
+    args = parser.parse_args()
+    try:
+        if args.check_only:
+            report = inspect_inputs(args.motion, args.model)
+            print(json.dumps(report, indent=2))
+            return 0 if report['compatible'] else 1
+        if any(getattr(args, key) is None for key in ('output', 'runtime', 'python', 'height', 'mass')):
+            parser.error('--output, --runtime, --python, --height en --mass zijn nodig')
+        report = run_analysis(args.motion, args.model, args.output, args.runtime, args.python,
+                              args.height, args.mass, args.treadmill_speed)
+        print(json.dumps(report, indent=2))
+        return 0
+    except Exception as error:
+        print(f'GaitDynamics gestopt: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
