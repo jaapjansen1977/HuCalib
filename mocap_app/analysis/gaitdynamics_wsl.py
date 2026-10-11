@@ -63,7 +63,8 @@ class WslBackend:
         result = self.runner(arguments, timeout=timeout, input=input)
         result.stdout = decode_output(result.stdout)
         if result.returncode:
-            raise RuntimeError(f'Opdracht mislukt ({result.returncode}): {result.stdout[-4000:]}')
+            command = subprocess.list2cmdline(arguments)
+            raise RuntimeError(f'Opdracht mislukt ({result.returncode}): {command}\n{result.stdout[-4000:]}')
         return result.stdout
 
     def _linux(self, arguments, user=USER, timeout=120, input=None):
@@ -118,8 +119,16 @@ class WslBackend:
             return self._state('restart_required', message='Herstart Windows als de installatie daarom vraagt. Open daarna HU3D kinematics en klik opnieuw op Installeren / doorgaan. De app controleert wat al klaar is.')
         if status['status'] == 'distribution_required':
             self.notify('Ubuntu 24.04 wordt onder jouw Windows-account geïnstalleerd, zonder interactieve eerste start.')
-            self._command(['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch', '--version', '2'], timeout=1800)
+            # Older WSL clients reject --version on --install, printing their
+            # entire help and returning 0xffffffff. Check WSL2 after installing.
+            self._command(['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'], timeout=1800)
             status = self.probe()
+            if status['status'] == 'unsupported':
+                # Only convert the distribution created by this installation
+                # step. Existing distributions/defaults are never changed.
+                self.notify('De zojuist geïnstalleerde Ubuntu 24.04 wordt omgezet naar WSL2.')
+                self._command(['wsl.exe', '--set-version', DISTRIBUTION, '2'], timeout=1800)
+                status = self.probe()
             if status['status'] != 'environment_required':
                 if status['status'] == 'ready':
                     return status

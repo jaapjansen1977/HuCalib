@@ -80,8 +80,26 @@ class WslTests(unittest.TestCase):
         with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
             self.assertEqual(backend.install()['status'], 'ready')
         args = self.calls[0][0]
-        self.assertEqual(args, ['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch', '--version', '2'])
+        self.assertEqual(args, ['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'])
         self.assertTrue(all(call[0][0] != 'powershell.exe' for call in self.calls))
+
+    def test_older_wsl_client_that_rejects_install_version_option_can_install(self):
+        def old_client(args, **kwargs):
+            self.calls.append((args, kwargs))
+            if '--install' in args and '--version' in args:
+                return subprocess.CompletedProcess(args, 4294967295, 'Gebruik: wsl.exe [Opties]\n--set-default-version <Versie>')
+            return subprocess.CompletedProcess(args, 0, '')
+        backend = self.backend(runner=old_client)
+        with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
+            self.assertEqual(backend.install()['status'], 'ready')
+        self.assertNotIn('--version', self.calls[0][0])
+
+    def test_new_distribution_on_wsl1_is_converted_without_changing_global_default(self):
+        backend = self.backend()
+        with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'unsupported'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
+            self.assertEqual(backend.install()['status'], 'ready')
+        self.assertEqual(self.calls[1][0], ['wsl.exe', '--set-version', DISTRIBUTION, '2'])
+        self.assertFalse(any('--set-default-version' in call[0] or '--shutdown' in call[0] for call in self.calls))
 
     def test_spaces_and_shell_metacharacters_are_passed_as_one_path_argument(self):
         backend = self.backend(text='/mnt/c/example')

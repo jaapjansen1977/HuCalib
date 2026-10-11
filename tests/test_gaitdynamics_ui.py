@@ -68,6 +68,14 @@ class GaitDynamicsUiTests(unittest.TestCase):
         dialog.reject()
         self.assertFalse(dialog.isVisible())
 
+    def test_install_error_details_do_not_replace_the_short_status_label(self):
+        dialog = GaitDynamicsSetupDialog()
+        self.addCleanup(dialog.deleteLater)
+        message = 'Opdracht mislukt (4294967295): wsl.exe --install\n' + 'Helptekst\n' * 100
+        dialog._result({'status': 'failed', 'message': message})
+        self.assertLess(len(dialog.summary.text()), 120)
+        self.assertIn('4294967295', dialog.details.toPlainText())
+
 
 if __name__ == '__main__':
     unittest.main()

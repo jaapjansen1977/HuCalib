@@ -100,7 +100,11 @@ class GaitDynamicsSetupDialog(QDialog):
 
     def _result(self, value):
         self.status = value
-        self.summary.setText(value.get('message', value['status']))
+        if value['status'] == 'failed':
+            self.summary.setText('Installatie of controle niet voltooid. Bekijk de foutdetails hieronder.')
+            self.details.appendPlainText(value.get('message', 'Onbekende fout'))
+        else:
+            self.summary.setText(value.get('message', value['status']))
         if value.get('log'):
             self.details.appendPlainText('Installatielog: ' + value['log'])
 
