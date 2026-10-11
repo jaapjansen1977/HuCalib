@@ -90,7 +90,7 @@ class MotionResultsDialog(QDialog):
         title.setWordWrap(True)
         title.setStyleSheet('font-size: 22px; font-weight: bold; color: #172b44;')
         layout.addWidget(title)
-        layout.addWidget(QLabel(f'{len(self.result.names)} modelcoördinaten · {len(self.result.values)} tijdstappen'))
+        layout.addWidget(QLabel(f'{len(self.result.names)} {"uitvoerkolommen" if forces else "modelcoördinaten"} · {len(self.result.values)} tijdstappen'))
         self.coordinate = QComboBox()
         self.coordinate.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.coordinate.setMinimumContentsLength(12)
