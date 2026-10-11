@@ -150,6 +150,11 @@ timing of fysieke camera-identiteit.
 
 ### Modelconversie voor GaitDynamics testen
 
+De [geslaagde Windows-testbuild van commit fdee35b](https://github.com/jaapjansen1977/HuCalib/actions/runs/38135537887)
+bevat deze bediening. Download onder **Artifacts** de ZIP
+**HuCalib-Windows-testbuild-fdee35b…** en pak die in een aparte, korte map uit.
+Je kunt de Pose2Sim-omgeving uit je vorige testmap blijven gebruiken.
+
 Open na de geslaagde analyse **GaitDynamics voorbereiden**. Controleer de
 model- en bewegingsbestanden en gebruik bij **Analyseomgeving** dezelfde
 Pose2Sim-Python als hierboven. Klik **Pose2Sim-model converteren…**, kies een

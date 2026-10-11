@@ -139,6 +139,41 @@ geen kniebelastingen of gewrichtsmomenten berekend in deze eerste koppeling.
 
 ## Proef en beperkingen
 
+### Volledige Pose2Sim-modelconversie en CPU-proef
+
+De [volledige proef met vier officiële Pose2Sim-video's](https://github.com/jaapjansen1977/HuCalib/actions/runs/38135646869)
+is geslaagd op 11 oktober 2026, commit
+`f87e1a41091cef361ecf5180fbe6802388b9c272`. In deze uitvoering slagen ook de
+vier echte OpenSim-conversietests en de asynchrone interfaceproef op **Windows**
+en Linux. De [Windows-testbuild](https://github.com/jaapjansen1977/HuCalib/actions/runs/38135537887)
+van commit `fdee35b` bevat dezelfde analysecode: 69 gewone tests slagen;
+de vier OpenSim-tests draaien in de afzonderlijke rekenomgeving. De gebouwde
+exe controleert ook de meegeleverde conversieadapter en knoppen bij 640×480.
+
+| Controle | Werkelijk resultaat |
+|---|---|
+| Pose2Sim | 4 camera's, alle 7 stappen, 96 tijdstappen met 62 coördinaten |
+| Conversie | 23 onafhankelijke coördinaten; alle 96 bronframes gecontroleerd |
+| Beenposities en lichaamsoriëntaties | Behouden tot numerieke afronding |
+| Positieafwijking van de romp | Maximaal 16,3 mm; RMS 9,5 mm |
+| Lichaamsmassa | 70 kg voor en na conversie |
+| OpenSim tegenover nimblephysics | Overeenstemming tot numerieke afronding |
+| Upstream GaitDynamics-benadering | Maximaal 3,94 mm voetpositieverschil en 0,53° oriëntatieverschil |
+| CPU-krachtvoorspelling | 159 eindige uitvoerregels, 19 kolommen, op 100 Hz |
+| Uitvoertijdsinterval | 0,01667 tot 1,59667 s; broninterval 0,01666667 tot 1,6 s |
+
+De [vastgelegde validatiesamenvatting](examples/pose2sim-gaitdynamics-validatie.json)
+komt uit de openbare GitHub Actions-validatie. Download het artifact
+**Pose2Sim-GaitDynamics-result-…** uit die uitvoering voor de volledige
+geconverteerde bestanden, krachten, rapporten en logs.
+
+Deze proef gebruikt de bekende resolutie-uitzondering van de officiële demo.
+De lichaamsmassa komt uit het geschaalde Pose2Sim-model; 1,75 m persoonslengte
+en 0 m/s loopbandsnelheid zijn demo-instellingen. Het bevestigt de technische
+keten, geen meetnauwkeurigheid of overeenkomst met krachtplaatmetingen.
+Native Windows-krachtvoorspelling, de WSL2-uitvoering en echte webcams zijn
+niet getest. De **modelconversie op Windows is wel getest**.
+
 ### Tijdverwerking voor krachtvoorspelling
 
 GaitDynamics verwacht 100 Hz. De afzonderlijke worker maakt daarvoor een
@@ -162,8 +197,8 @@ verifieert die afronding expliciet.
 De [echte CPU-proef op GitHub Actions](https://github.com/jaapjansen1977/HuCalib/actions/runs/38133031633)
 is geslaagd op 11 oktober 2026, voor appcommit
 `f6482e858e3ea2695ab15a77adaa0ef536d08c28`: 499 regels met eindige waarden
-en 19 kolommen, met de officiële refinement-gewichten. De Windows-app heeft
-66 unit-tests; de Windows-build controleert ook het nieuwe invoervenster.
+en 19 kolommen, met de officiële refinement-gewichten. Die eerdere appbuild
+had 66 unit-tests en een startproef van het invoervenster.
 
 ![Invoercontrole van de officiële GaitDynamics-demo, na de gedocumenteerde headercorrectie](examples/gaitdynamics-controle.png)
 
@@ -182,6 +217,8 @@ gegevens worden daarmee niet gewijzigd.
 
 De cloudmachine kan de officiële modeldownloads momenteel niet bereiken
 (HTTP 403 via de netwerkproxy). De CPU-proef wordt daarom op de Linux-runner
-van GitHub Actions uitgevoerd. Een geslaagde Linux-proef bevestigt geen
-native Windows- of WSL2-uitvoering en valideert de Pose2Sim-modelconversie niet.
+van GitHub Actions uitgevoerd. De afzonderlijke officiële GaitDynamics-demo
+valideert geen Pose2Sim-conversie; daarvoor dient de hierboven beschreven
+volledige videoproef. Een geslaagde Linux-CPU-proef bevestigt geen native
+Windows- of WSL2-krachtvoorspelling.
 Je hebt voor deze voorbeeldproef geen webcams of ChArUco-bord nodig.
