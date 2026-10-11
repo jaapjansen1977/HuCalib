@@ -3,7 +3,8 @@
 Deze testversie is een **draagbare ZIP**, geen installer of gepubliceerde
 release. Je bestaande HuCalib-installatie wordt niet bijgewerkt. De testbuild
 heeft automatische updates uitgeschakeld en bewaart gegevens in zijn eigen
-map. Pose2Sim wordt apart geïnstalleerd. Voor de eerste tests zijn geen webcams
+map. De zichtbare appnaam is **HU3D kinematics**; het startbestand heet
+`HuCalib.exe`. Pose2Sim wordt apart geïnstalleerd. Voor de eerste tests zijn geen webcams
 nodig.
 
 ## 1. De testbuild verkrijgen
@@ -46,6 +47,37 @@ SHA256SUMS.txt
 De app alleen bekijken vraagt geen Python-installatie: open
 `HuCalib\HuCalib.exe`. Je ziet **Windows-testbuild** in de venstertitel.
 Voor bewegingsanalyse is stap 2 nodig.
+
+### Een volgende testbuild proberen
+
+Pak een nieuwe build uit in een aparte map met een korte naam, bijvoorbeeld
+`C:\Users\Asus\HU3D-Test2`. Je kunt je bestaande analyseomgeving blijven
+gebruiken: kies in het analysevenster het bestaande
+`.venv-pose2sim\Scripts\python.exe` uit de vorige testmap en kies
+`Demo\Config.toml` uit de nieuwe testmap. Een nieuwe Pose2Sim-installatie is dan
+niet nodig. Bewaar de vorige testmap: daar staat de gebruikte Python-omgeving.
+Verplaats een bestaande `.venv-pose2sim` niet.
+
+Controleer bij deze build ook het volgende, zonder webcams of ChArUco-bord:
+
+- Het hoofdvenster, analysevenster en de grafieken vermelden **HU3D kinematics**.
+- Het analysevenster opent binnen de beschikbare schermruimte. Verklein het
+  venster: de inhoud scrolt, de actieknoppen, status en voortgang blijven staan.
+- Ook bij je normale Windows-schermschaal blijven alle vijf knoppen bereikbaar.
+- Het hoofdvenster heeft scrollbare pagina's en navigatie; de grafiek schaalt
+  mee wanneer je het resultatenvenster kleiner maakt.
+
+De vensters gebruiken de schermgrootte in Qt-logische pixels, zodat Windows-
+schermschaal en de taakbalk meetellen. De automatische startproef controleert
+het hoofdvenster en de analyseknoppen bij 640×480 en 864×500. De unit-tests
+controleren ook grotere tekst. Test de daadwerkelijke Windows-schermschaal
+op je eigen computer.
+
+Deze afbeeldingen tonen de aangepaste interface bij 864×500 in de Qt-cloudtest:
+
+![Compact hoofdvenster](examples/hu3d-hoofdvenster-compact.png)
+
+![Compact analysevenster met vaste status, voortgang en knoppen](examples/hu3d-analyse-compact.png)
 
 ## 2. Eenmalig de analyseomgeving instellen
 

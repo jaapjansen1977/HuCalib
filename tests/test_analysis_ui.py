@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import QProcess
+from PySide6.QtCore import QPoint, QProcess
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication
 
@@ -59,6 +59,41 @@ class AnalysisUiTests(unittest.TestCase):
         self.assertFalse(event.isAccepted())
         self.dialog.phase = 'idle'
 
+    def test_small_windows_keep_all_actions_visible_while_content_scrolls(self):
+        self.dialog.show()
+        self.addCleanup(self.dialog.close)
+        for point_size in (10, 15):
+            font = self.dialog.font()
+            font.setPointSize(point_size)
+            self.dialog.setFont(font)
+            for width, height in ((640, 480), (864, 500), (1024, 640)):
+                with self.subTest(font=point_size, size=(width, height)):
+                    self.dialog.resize(width, height)
+                    self.app.processEvents()
+                    self.app.processEvents()
+                    self.assertLessEqual(self.dialog.width(), width)
+                    self.assertLessEqual(self.dialog.height(), height)
+                    for button in self.dialog._action_buttons:
+                        position = button.mapTo(self.dialog, QPoint(0, 0))
+                        self.assertTrue(self.dialog.rect().contains(position))
+                        self.assertTrue(self.dialog.rect().contains(position + button.rect().bottomRight()))
+                    scroll = self.dialog.content_scroll
+                    self.assertGreater(scroll.verticalScrollBar().maximum(), 0)
+                    scroll.ensureWidgetVisible(self.dialog.config)
+                    self.app.processEvents()
+                    position = self.dialog.config.mapTo(scroll.viewport(), QPoint(0, 0))
+                    self.assertTrue(scroll.viewport().rect().contains(position))
+                    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+                    self.app.processEvents()
+                    # Scrolling inputs/logs must never move the action buttons.
+                    self.assertTrue(self.dialog.close_button.isVisible())
+
+    def test_initial_dialog_fits_available_screen(self):
+        self.dialog.show()
+        self.app.processEvents()
+        self.addCleanup(self.dialog.close)
+        self.assertTrue(self.dialog.screen().availableGeometry().contains(self.dialog.frameGeometry()))
+
     def test_failed_python_start_unlocks_controls(self):
         self.dialog.phase = 'checking'
         self.dialog._process_error(QProcess.ProcessError.FailedToStart)
@@ -89,6 +124,13 @@ class AnalysisUiTests(unittest.TestCase):
         for index in range(view.coordinate.count()):
             view.coordinate.setCurrentIndex(index)
             self.assertEqual(view.plot.name, result.names[index])
+        view.show()
+        self.addCleanup(view.close)
+        view.resize(640, 480)
+        self.app.processEvents()
+        self.assertLessEqual(view.width(), 640)
+        self.assertLessEqual(view.height(), 480)
+        self.assertGreater(view.plot.height(), 150)
 
     def test_successful_analysis_makes_graphs_available(self):
         import json

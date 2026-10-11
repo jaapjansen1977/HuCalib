@@ -8,14 +8,16 @@ from pathlib import Path
 import sys
 import uuid
 
-from PySide6.QtCore import QProcess, QProcessEnvironment, QSettings, QTimer, QUrl, Qt
+from PySide6.QtCore import QProcess, QProcessEnvironment, QSettings, QSize, QTimer, QUrl, Qt
 from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout,
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QPlainTextEdit,
-    QProgressBar, QPushButton, QVBoxLayout, QWidget)
+    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QPlainTextEdit,
+    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from mocap_app.analysis.pose2sim import STAGES, STAGE_LABELS
 from mocap_app.analysis.results import MotionResult, coordinate_label
+from mocap_app.core.branding import APP_NAME
+from mocap_app.ui.window_geometry import fit_window_to_screen
 
 
 def warning_text(warning: dict) -> str:
@@ -30,7 +32,7 @@ class CoordinatePlot(QWidget):
     """Small native Qt plot; no plotting dependencies in the Windows app."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(640, 340)
+        self.setMinimumSize(280, 200)
         self.result = None
         self.name = None
 
@@ -80,14 +82,19 @@ class MotionResultsDialog(QDialog):
     def __init__(self, path: Path, parent=None):
         super().__init__(parent)
         self.result = MotionResult.read(path)
-        self.setWindowTitle('Bewegingsresultaten — HuCalib')
-        self.resize(960, 600)
+        self.setWindowTitle(f'Bewegingsresultaten — {APP_NAME}')
+        self.setMinimumSize(420, 340)
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
         layout = QVBoxLayout(self)
         title = QLabel('Gewrichtshoeken en verplaatsingen')
+        title.setWordWrap(True)
         title.setStyleSheet('font-size: 22px; font-weight: bold; color: #172b44;')
         layout.addWidget(title)
         layout.addWidget(QLabel(f'{len(self.result.names)} modelcoördinaten · {len(self.result.values)} tijdstappen'))
         self.coordinate = QComboBox()
+        self.coordinate.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.coordinate.setMinimumContentsLength(12)
+        self.coordinate.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         for name in self.result.names:
             self.coordinate.addItem(coordinate_label(name), name)
         layout.addWidget(self.coordinate)
@@ -102,6 +109,7 @@ class MotionResultsDialog(QDialog):
         self.coordinate.setCurrentIndex(max(0, preferred))
         self._update_plot()
         self.setStyleSheet('QDialog { background: #f4f7fb; } QComboBox { padding: 8px; }')
+        fit_window_to_screen(self, QSize(960, 600))
 
     def _update_plot(self):
         self.plot.set_coordinate(self.result, self.coordinate.currentData())
@@ -111,8 +119,9 @@ class AnalysisDialog(QDialog):
     def __init__(self, settings_path: Path, initial_session: Path | None,
                  output_base: Path, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Bewegingsanalyse — HuCalib')
-        self.resize(1040, 900)
+        self.setWindowTitle(f'Bewegingsanalyse — {APP_NAME}')
+        self.setMinimumSize(480, 340)
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
         font = self.font()
         font.setPointSize(10)
         self.setFont(font)
@@ -131,8 +140,14 @@ class AnalysisDialog(QDialog):
         self.checked = False
         self._buffer = ''
         self._results_dialog = None
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(12, 12, 12, 12)
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(12)
         title = QLabel('Bewegingsanalyse')
         title.setStyleSheet('font-size: 25px; font-weight: bold; color: #172b44;')
@@ -142,32 +157,36 @@ class AnalysisDialog(QDialog):
         layout.addWidget(subtitle)
         inputs = QGroupBox('1. Opname en opslag')
         form = QFormLayout(inputs)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.session = self._path_row(form, 'Opnamemap', str(initial_session or ''), 'directory')
         self.output_base = self._path_row(form, 'Resultaten bewaren in', str(output_base), 'directory')
         layout.addWidget(inputs)
         settings = QGroupBox('2. Analyse-instellingen')
         form = QFormLayout(settings)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.python = self._path_row(form, 'Analyseomgeving', self.settings.value('python', '', str), 'python')
         self.config = self._path_row(form, 'Instellingenbestand', self.settings.value('config', '', str), 'config')
         help_text = QLabel('Kies eenmalig de Python uit je Pose2Sim-omgeving en een volledig Pose2Sim-instellingenbestand.\n'
                           'De analyse gebruikt CPU-verwerking. De originele opname blijft bewaard.')
         help_text.setWordWrap(True)
         form.addRow(help_text)
-        self.diagnostic = QCheckBox('Diagnostische demoproef: afwijkende kalibratieresolutie toestaan')
+        self.diagnostic = QCheckBox('Diagnostische demoproef')
         self.diagnostic.setToolTip('Alleen voor een functionele demoproef. Framegaten blijven geblokkeerd.')
         form.addRow(self.diagnostic)
+        diagnostic_help = QLabel('Staat een afwijkende kalibratieresolutie toe. Alleen voor de demoproef.')
+        diagnostic_help.setWordWrap(True)
+        form.addRow(diagnostic_help)
         layout.addWidget(settings)
         self.summary = QLabel('Nog geen opname gecontroleerd.')
         self.summary.setWordWrap(True)
         self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.summary)
         self.status = QLabel('Klaar om een opname te kiezen')
+        self.status.setWordWrap(True)
         self.status.setObjectName('analysisStatus')
-        layout.addWidget(self.status)
         self.progress = QProgressBar()
         self.progress.setRange(0, len(STAGES))
         self.progress.setFormat('%v van %m stappen voltooid')
-        layout.addWidget(self.progress)
         self.stages = QListWidget()
         self.stages.setMinimumHeight(170)
         self.stages.setMaximumHeight(180)
@@ -176,18 +195,25 @@ class AnalysisDialog(QDialog):
         layout.addWidget(self.stages)
         self.messages = QPlainTextEdit()
         self.messages.setReadOnly(True)
+        self.messages.setMinimumHeight(100)
         self.messages.setPlaceholderText('Invoercontroles, waarschuwingen en foutmeldingen verschijnen hier.')
         layout.addWidget(self.messages, 1)
-        actions = QHBoxLayout()
+        self.content_scroll.setWidget(content)
+        outer_layout.addWidget(self.content_scroll, 1)
+        outer_layout.addWidget(self.status)
+        outer_layout.addWidget(self.progress)
+        self.actions = QGridLayout()
         self.check_button = QPushButton('Opname controleren')
         self.start_button = QPushButton('Analyse starten')
         self.start_button.setObjectName('startAnalysis')
         self.folder_button = QPushButton('Resultatenmap openen')
         self.graph_button = QPushButton('Grafieken bekijken')
         self.close_button = QPushButton('Sluiten')
-        for button in (self.check_button, self.start_button, self.folder_button, self.graph_button, self.close_button):
-            actions.addWidget(button)
-        layout.addLayout(actions)
+        self._action_buttons = (self.check_button, self.start_button, self.folder_button,
+                                self.graph_button, self.close_button)
+        self._action_columns = None
+        outer_layout.addLayout(self.actions)
+        self._arrange_actions()
         self.check_button.clicked.connect(self._check)
         self.start_button.clicked.connect(self._start)
         self.folder_button.clicked.connect(self._open_folder)
@@ -209,6 +235,29 @@ class AnalysisDialog(QDialog):
             QLabel#analysisStatus { font-weight: bold; color: #1769c2; }
         ''')
         self._update_buttons()
+        fit_window_to_screen(self, QSize(960, 740))
+
+    def _arrange_actions(self):
+        columns = 3 if self.width() >= 760 else 2
+        if columns == self._action_columns:
+            return
+        self._action_columns = columns
+        while self.actions.count():
+            self.actions.takeAt(0)
+        for index, button in enumerate(self._action_buttons):
+            # Primary actions first, close at the bottom right.
+            if columns == 3:
+                row, col = ((0, index) if index < 2 else (1, index - 2))
+            else:
+                row, col = (divmod(index, 2) if index < 4 else (2, 1))
+            self.actions.addWidget(button, row, col)
+        for col in range(3):
+            self.actions.setColumnStretch(col, 1 if col < columns else 0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_action_buttons'):
+            self._arrange_actions()
 
     @property
     def busy(self):
