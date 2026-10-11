@@ -101,6 +101,16 @@ class WslTests(unittest.TestCase):
         self.assertEqual(self.calls[1][0], ['wsl.exe', '--set-version', DISTRIBUTION, '2'])
         self.assertFalse(any('--set-default-version' in call[0] or '--shutdown' in call[0] for call in self.calls))
 
+    def test_legacy_store_download_is_registered_without_interactive_account_setup(self):
+        backend = self.backend()
+        with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'distribution_required'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
+            self.assertEqual(backend.install()['status'], 'ready')
+        args = self.calls[1][0]
+        self.assertEqual(args[0], 'powershell.exe')
+        self.assertIn('CanonicalGroupLimited.Ubuntu24.04LTS', args[-1])
+        self.assertIn('install --root', args[-1])
+        self.assertNotIn('-Verb RunAs', args[-1])
+
     def test_spaces_and_shell_metacharacters_are_passed_as_one_path_argument(self):
         backend = self.backend(text='/mnt/c/example')
         path = self.root / "ruimte ' & $(whoami) — motion.mot"

@@ -123,6 +123,20 @@ class WslBackend:
             # entire help and returning 0xffffffff. Check WSL2 after installing.
             self._command(['wsl.exe', '--install', '--distribution', DISTRIBUTION, '--no-launch'], timeout=1800)
             status = self.probe()
+            if status['status'] == 'distribution_required':
+                # Legacy Store distributions are downloaded by --install but
+                # registered only by their launcher. --no-launch skips that.
+                # Register Canonical's Ubuntu 24.04 noninteractively as root;
+                # do not launch/modify the user's other Ubuntu or Docker.
+                self.notify('De Ubuntu 24.04-app is gedownload; de eerste registratie wordt nu afgerond zonder Linux-accountvragen.')
+                script = ("$ErrorActionPreference='Stop'; "
+                    "$p=Get-AppxPackage -Name 'CanonicalGroupLimited.Ubuntu24.04LTS'; "
+                    "if (-not $p) { throw 'Ubuntu 24.04 is nog niet geregistreerd en het Ubuntu-app-pakket is niet gevonden.' }; "
+                    "$launchers=@(Get-ChildItem -LiteralPath $p.InstallLocation -Filter 'ubuntu*.exe' -File); "
+                    "if ($launchers.Count -ne 1) { throw 'De Ubuntu 24.04-startmodule kon niet eenduidig worden gevonden.' }; "
+                    "& ($launchers[0].FullName) install --root; exit $LASTEXITCODE")
+                self._command(['powershell.exe', '-NoProfile', '-Command', script], timeout=1800)
+                status = self.probe()
             if status['status'] == 'unsupported':
                 # Only convert the distribution created by this installation
                 # step. Existing distributions/defaults are never changed.

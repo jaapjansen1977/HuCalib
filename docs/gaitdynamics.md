@@ -31,6 +31,8 @@ binnen WSL2 draaien; je hoeft daarvoor geen Linux-opdrachten in te voeren.
    Ubuntu 24.04 wordt daarna zonder interactieve eerste start onder jouw
    gewone Windows-account geïnstalleerd. De app controleert daarna WSL2 en
    zet uitsluitend een zojuist nieuw geïnstalleerde WSL1-distributie om naar WSL2.
+   Bij oudere WSL-versies rondt de app ook de eerste registratie van het
+   officiële Ubuntu 24.04 Store-pakket af, zonder interactieve accountvragen.
 4. Wacht tot **GaitDynamics is gereed** verschijnt. De app installeert een
    afzonderlijke Python 3.12-omgeving, CPU-PyTorch en nimblephysics binnen
    Ubuntu. Beide AI-modellen worden met vastgelegde SHA256-hashes gecontroleerd.
