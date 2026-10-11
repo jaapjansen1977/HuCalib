@@ -51,6 +51,7 @@ def run_smoke(report_path: str) -> int:
                     runtime = (Path(sys._MEIPASS) / 'analysis_runtime' if result['frozen']
                                else Path(__file__).resolve().parents[1])
                     assert (runtime / 'mocap_app/analysis/pose2sim_worker.py').is_file()
+                    assert (runtime / 'mocap_app/analysis/model_conversion.py').is_file()
                     sample = root / 'example.mot'
                     sample.write_text('nRows=2\nnColumns=2\ninDegrees=yes\nendheader\ntime knee_angle_r\n0 10\n.1 20\n')
                     view = MotionResultsDialog(sample, dialog)
@@ -66,11 +67,19 @@ def run_smoke(report_path: str) -> int:
                     gait._check()
                     assert gait.report is not None and not gait.report['compatible']
                     assert gait.save_button.isEnabled()
+                    for width, height in ((640, 480), (864, 500)):
+                        gait.resize(width, height)
+                        app.processEvents()
+                        assert gait.width() <= width and gait.height() <= height
+                        for button in (gait.convert_button, gait.check_button, gait.save_button, gait.close_button):
+                            position = button.mapTo(gait, QPoint(0, 0))
+                            assert gait.rect().contains(position + button.rect().bottomRight())
                     gait.close()
                     result.update(status='passed', analysis_dialog_opens=True,
                                   analysis_runtime_present=True, automatic_updates_disabled=True, graph_viewer_opens=True,
                                   small_screen_actions_visible=True, product_name='HU3D kinematics',
-                                  gaitdynamics_input_dialog_opens=True)
+                                  gaitdynamics_input_dialog_opens=True, model_conversion_runtime_present=True,
+                                  model_conversion_controls_fit_small_screen=True)
                 except Exception as error:
                     result.update(status='failed', error=repr(error))
                 finally:

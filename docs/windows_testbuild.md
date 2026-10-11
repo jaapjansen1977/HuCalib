@@ -148,6 +148,21 @@ eindige waarden en bestandsstructuur. Kleine numerieke verschillen tussen
 platforms zijn mogelijk. De demo valideert geen meetnauwkeurigheid, webcam-
 timing of fysieke camera-identiteit.
 
+### Modelconversie voor GaitDynamics testen
+
+Open na de geslaagde analyse **GaitDynamics voorbereiden**. Controleer de
+model- en bewegingsbestanden en gebruik bij **Analyseomgeving** dezelfde
+Pose2Sim-Python als hierboven. Klik **Pose2Sim-model converteren…**, kies een
+resultatenmap en wacht op **Modelconversie gereed**. Het venster selecteert
+vervolgens de nieuwe `motion.mot` en `model.osim`. Bewaar `conversion.json`;
+dit bevat de geometrische afwijkingen en de controles op alle tijdstappen.
+Voor deze test zijn geen webcams of nieuwe installaties nodig.
+
+De conversie werkt in Windows. De krachtvoorspelling zelf gebruikt nog een
+afzonderlijke Linux/WSL2-omgeving en wordt niet door deze knop gestart.
+Zie [de GaitDynamics-instructies](gaitdynamics.md) voor de werkwijze en
+beperkingen van de modelvereenvoudiging.
+
 ## 4. Testresultaten vastleggen
 
 ### Filterfout in de eerste testbuild
