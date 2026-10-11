@@ -102,8 +102,8 @@ ze bij GaitDynamics zonder de oorspronkelijke voetbeweging te veranderen.
    Daar wordt een nieuwe map `GaitDynamics-conversie-…` aangemaakt.
 4. Wacht op **Modelconversie gereed**. Het venster controleert en selecteert
    daarna automatisch de nieuwe bestanden. **Invoer geschikt** betekent
-   voorbereid voor de afzonderlijke Linux/WSL2-rekenmodule; de Windows-knop
-   voert nog geen krachtvoorspelling uit.
+   voorbereid voor de afzonderlijke Linux/WSL2-rekenmodule. Kies vervolgens
+   **Krachten voorspellen…** om vanuit de Windows-app de berekening te starten.
 
 Uitvoer: `motion.mot` met 23 coördinaten, `model.osim`, `conversion.json`,
 `conversion.log` bij gebruik van de interface, en `kinematics-reference.json`
@@ -204,6 +204,19 @@ De resultaten zijn modelvoorspellingen, geen krachtplaatmetingen. Er worden
 geen kniebelastingen of gewrichtsmomenten berekend in deze eerste koppeling.
 
 ## Proef en beperkingen
+
+### Nieuwe Windows-bediening en WSL-adapter
+
+De [Windows-testbuild met installatiewizard](https://github.com/jaapjansen1977/HuCalib/actions/runs/38137537953)
+en de [echte CPU-proef via de nieuwe adapter](https://github.com/jaapjansen1977/HuCalib/actions/runs/38137538021)
+zijn geslaagd voor commit `863ea90`. In de gewone testsuite slagen 81 tests;
+de vier OpenSim-tests worden apart uitgevoerd en slagen ook. De verpakte
+exe controleert de installatiepayload en nieuwe vensters op 640×480 bij
+10- en 15-punts letters. De nieuwe adapter gebruikt echte AI-modellen in
+de Linux-CPU-proef, met nagebootste `wsl.exe`-opdrachten en bestandsnamen met
+spaties, een apostrof en Unicode. Dit test geen Windows-herstart of WSL-boot.
+De hierboven beschreven installatieproef op een echte Windows-computer
+blijft nodig.
 
 ### Volledige Pose2Sim-modelconversie en CPU-proef
 

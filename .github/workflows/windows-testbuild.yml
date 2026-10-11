@@ -13,6 +13,9 @@ on:
       - 'tests/**'
       - 'tools/**'
       - 'testdata/**'
+      - 'docs/gaitdynamics.md'
+      - 'docs/windows_testbuild.md'
+      - 'Installeer-GaitDynamics.cmd'
   workflow_dispatch:
 
 permissions:
