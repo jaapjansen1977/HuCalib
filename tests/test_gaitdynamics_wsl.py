@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -110,6 +111,19 @@ class WslTests(unittest.TestCase):
         self.assertIn('CanonicalGroupLimited.Ubuntu24.04LTS', args[-1])
         self.assertIn('install --root', args[-1])
         self.assertNotIn('-Verb RunAs', args[-1])
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Requires the native Windows PowerShell parser')
+    def test_native_windows_parser_accepts_legacy_registration_script_without_executing_it(self):
+        backend = self.backend()
+        with patch.object(backend, 'probe', side_effect=[{'status': 'distribution_required'}, {'status': 'distribution_required'}, {'status': 'environment_required'}, {'status': 'ready', 'message': 'gereed'}]), patch.object(backend, 'linux_path', return_value='/mnt/c/Temp/setup'):
+            backend.install()
+        script = self.calls[1][0][-1]
+        parser = ("$source=[Console]::In.ReadToEnd(); $tokens=$null; $errors=$null; "
+                  "[System.Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors) | Out-Null; "
+                  "if ($errors.Count) { $errors | Out-String | Write-Output; exit 1 }")
+        result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', parser],
+                                input=script, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_spaces_and_shell_metacharacters_are_passed_as_one_path_argument(self):
         backend = self.backend(text='/mnt/c/example')
