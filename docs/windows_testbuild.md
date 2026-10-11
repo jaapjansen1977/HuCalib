@@ -118,6 +118,17 @@ timing of fysieke camera-identiteit.
 
 ## 4. Testresultaten vastleggen
 
+### Filterfout in de eerste testbuild
+
+Krijg je tijdens filtering `Failed to import any of the following Qt binding
+modules`? De eerste testbuild schakelt het tonen van filtergrafieken uit, maar
+het opslaan ervan gebruikt in Pose2Sim eveneens Qt. Open `Demo\Config.toml`
+met Kladblok en wijzig onder `[filtering]` `save_filt_plots = true` in
+`save_filt_plots = false`. Bewaar het bestand en start de analyse opnieuw met
+een nieuwe resultatenmap. Bewaar de vorige resultaten voor diagnose.
+De grafiekenviewer in HuCalib blijft beschikbaar. Nieuwere builds schakelen
+beide filtergrafiekopties automatisch uit.
+
 Noteer per punt **geslaagd**, **mislukt** of **niet getest**:
 
 | Controle | Verwachting |

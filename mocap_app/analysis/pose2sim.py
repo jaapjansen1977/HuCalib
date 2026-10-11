@@ -251,7 +251,9 @@ def run_analysis(session: Path, output: Path, config_template: Path, python: Pat
         config['pose'].update(device='cpu', backend='onnxruntime', parallel_workers_pose=1,
                               display_detection=False, save_video='none', overwrite_pose=True)
         config['synchronization'].update(synchronization_gui=False, display_sync_plots=False)
-        config['filtering'].update(display_figures=False)
+        # Pose2Sim creates a Qt plotWindow even when only saving filter plots.
+        # Keep both off in the separate analysis process; HuCalib plots results.
+        config['filtering'].update(display_figures=False, save_filt_plots=False)
         config['kinematics'].update(make_bvh=False, parallel_workers_kinematics=1)
         _json(output / 'effective-config.json', config)
         report.update(status='running', camera_mapping=mapping,

@@ -167,6 +167,9 @@ class AnalysisTests(unittest.TestCase):
 
     def test_complete_run_is_isolated_and_maps_camera_names(self):
         output = self.root / 'analysis'
+        # The official demo enables saved filter plots, which also require Qt.
+        self.config.write_text(self.config.read_text().replace(
+            '[filtering]', '[filtering]\ndisplay_figures = true\nsave_filt_plots = true'))
         original = (self.session / 'session.json').read_bytes()
         def fake_stage(*args, **kwargs):
             project = output / 'project'
@@ -183,6 +186,8 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual([m['camera_id'] for m in report['camera_mapping']], ['cam2', 'cam10'])
         config = json.loads((output / 'effective-config.json').read_text())
         self.assertEqual(config['pose']['device'], 'cpu')
+        self.assertFalse(config['filtering']['display_figures'])
+        self.assertFalse(config['filtering']['save_filt_plots'])
         # Windows may expand an 8.3 temporary path (RUNNER~1) to its long name.
         # Verify the actual directory rather than its platform-specific spelling.
         configured_project = Path(config['project']['project_dir'])
