@@ -3,9 +3,9 @@
 Na een geslaagde Pose2Sim-analyse biedt **GaitDynamics voorbereiden** een
 invoercontrole van het MOT-bestand en het bijbehorende OpenSim-model. Deze
 controle draait in de Windows-app, zonder GaitDynamics te installeren.
-Het venster geeft aan wat geschikt is en wat eerst aangepast moet worden.
-Je kunt het controlerapport bewaren. Bij meerdere resultaten kies je zelf de
-juiste combinatie van model en beweging.
+Met **Pose2Sim-model converteren…** maak je nu ook een passend model en
+bewegingsbestand. Dit gebruikt je bestaande Pose2Sim-Python met OpenSim;
+er is voor de conversie geen nieuwe Python-installatie nodig.
 
 De eerste rekenmodule voorspelt grondreactiekrachten en aangrijpingspunten
 voor beide voeten, met de officiële refinement-gewichten op CPU. Ze draait
@@ -14,7 +14,7 @@ beoogde route: dat is een Linux-omgeving op dezelfde computer. Native Windows
 wordt niet ondersteund, omdat nimblephysics geen Windows-wheels publiceert.
 De WSL2-koppeling is nog niet automatisch vanuit het Windows-venster gestart.
 
-## Wat nog niet rechtstreeks kan
+## Een Pose2Sim-resultaat converteren
 
 Het huidige Pose2Sim-model levert 62 coördinaten met een gesegmenteerde rug.
 GaitDynamics verwacht een ander lichaamsmodel met 23 onafhankelijke
@@ -22,12 +22,72 @@ coördinaten, waaronder `lumbar_extension`, `lumbar_bending` en
 `lumbar_rotation`. De Pose2Sim-rugsegmenten mogen niet zomaar worden hernoemd
 of opgeteld. Ook anatomische assen, gewrichtsdefinities en schaal moeten passen.
 
-Daarom blokkeert deze eerste koppeling het huidige Pose2Sim-model. De volgende
-stap is de gemeten/gereconstrueerde markertrajecten met een passend, geschaald
-GaitDynamics-model opnieuw verwerken via inverse kinematica, en die
-conversie valideren. Ontbrekende kinematica wordt in deze eerste versie niet
-met diffusie gegenereerd. Het gebruik van een willekeurig voorbeeldmodel bij
-jouw MOT-bestand is geen geldige vervanging voor modelconversie.
+De conversie gebruikt het geschaalde lichaamsmodel dat bij het MOT-bestand
+hoort. Ze behoudt de bekken- en beengeometrie en berekent de volledige
+ruimtelijke rompstand via OpenSim. De enkelgewrichten krijgen equivalente
+scharnierassen door hun lokale referentiekaders te roteren. Hierdoor passen
+ze bij GaitDynamics zonder de oorspronkelijke voetbeweging te veranderen.
+
+1. Open na de Pose2Sim-analyse **GaitDynamics voorbereiden**.
+2. Controleer **Bewegingsbestand**, **OpenSim-model** en **Analyseomgeving**.
+   Die laatste is dezelfde `.venv-pose2sim\Scripts\python.exe` die je al gebruikt.
+   Bij meerdere modellen/bewegingen moet je zelf de juiste combinatie kiezen.
+3. Klik **Pose2Sim-model converteren…** en kies waar de resultaten mogen komen.
+   Daar wordt een nieuwe map `GaitDynamics-conversie-…` aangemaakt.
+4. Wacht op **Modelconversie gereed**. Het venster controleert en selecteert
+   daarna automatisch de nieuwe bestanden. **Invoer geschikt** betekent
+   voorbereid voor de afzonderlijke Linux/WSL2-rekenmodule; de Windows-knop
+   voert nog geen krachtvoorspelling uit.
+
+Uitvoer: `motion.mot` met 23 coördinaten, `model.osim`, `conversion.json`,
+`conversion.log` bij gebruik van de interface, en `kinematics-reference.json`
+voor de onafhankelijke controle in nimblephysics. Bronnen blijven behouden.
+De tijdstippen en alle frames blijven behouden; ontbrekende hoeken of gaten
+worden niet ingevuld. Graden en radialen worden expliciet verwerkt.
+
+### Wat de conversie controleert en vereenvoudigt
+
+Een gesegmenteerde rug kan niet precies één starre romp worden. Een vast,
+effectief draaipunt wordt daarom afgestemd op om-en-om gekozen tijdstappen.
+De tussenliggende tijdstappen worden voor de geometrische controle gebruikt;
+de neutrale houding blijft behouden. De verschuiving van het draaipunt mag
+maximaal 50 mm bedragen. Over **alle** frames wordt vervolgens gecontroleerd:
+
+- Bekken-/beenposities blijven behouden binnen 0,001 mm.
+- De oriëntaties van benen, bekken en romp blijven behouden binnen 0,000001 rad.
+- De positieafwijking van de romp blijft onder 30 mm; grotere afwijkingen
+  blokkeren de conversie. Het rapport vermeldt maximum en RMS.
+- Totale lichaamsmassa blijft behouden. Massa, massamiddelpunt en traagheid
+  van de verwijderde bovenlichaamsegmenten worden in neutrale houding
+  samengevoegd in de romp.
+
+Dit zijn technische afwijzingsgrenzen, geen klinische nauwkeurigheidsnormen.
+Armen, hoofd en wervels bewegen in het nieuwe model niet meer afzonderlijk.
+De lumbar-hoeken beschrijven een equivalente rompstand, geen afzonderlijke
+wervelhoeken. Spieren worden verwijderd; dit model is niet bedoeld voor
+spierkrachten, kniebelastingen of gewrichtsmomenten. Het is een geometrische
+vereenvoudiging van de bestaande IK-uitkomst, geen nieuwe marker-IK-analyse.
+Alleen het Pose2Sim-model met gesegmenteerde rug wordt nu geconverteerd.
+
+Voor krachtvoorspelling vergelijkt de Linux-worker ook alle frames tussen
+OpenSim en nimblephysics en controleert hij de kinematica van GaitDynamics.
+De upstream benadert de kniebeweging met polynomen. Afwijkingen in
+voetposities boven 15 mm of lichaamsoriëntaties boven 5 graden blokkeren
+de voorspelling; de daadwerkelijk gemeten afwijkingen staan in
+`kinematics-check.json`. Een gelijke kolomnaam is dus onvoldoende om een
+afwijkend gewrichtsmodel stilzwijgend te accepteren.
+
+Een conversie via de opdrachtregel, met de bestaande Pose2Sim-Python:
+
+```powershell
+& 'C:\pad\naar\.venv-pose2sim\Scripts\python.exe' -m mocap_app.analysis.model_conversion `
+  --motion 'C:\pad\naar\beweging.mot' --model 'C:\pad\naar\geschaald-model.osim' `
+  --output 'C:\pad\naar\nieuwe-conversie'
+```
+
+Dit commando wordt uitgevoerd vanuit de bronrepository. De Windows-interface
+gebruikt de meegeleverde adapter in de uitgepakte app. Er worden geen
+ontbrekende bewegingen met diffusie gegenereerd.
 
 ## Afzonderlijke runtime voor een ontwikkelproef
 

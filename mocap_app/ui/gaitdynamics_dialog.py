@@ -20,6 +20,7 @@ class GaitDynamicsDialog(QDialog):
         self.setWindowTitle(f'GaitDynamics — {APP_NAME}')
         self.setMinimumSize(480, 340)
         self.report = None
+        self._file_buttons = []
         self.conversion_output = None
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -72,11 +73,13 @@ class GaitDynamicsDialog(QDialog):
         row = QHBoxLayout()
         field = QLineEdit(str(value or ''))
         button = QPushButton('Kiezen…')
+        self._file_buttons.append(button)
         row.addWidget(field, 1)
         row.addWidget(button)
         form.addRow(label, row)
         def choose():
-            path = QFileDialog.getOpenFileName(self, label, field.text(), f'OpenSim ({pattern})')[0]
+            kind = 'Python' if pattern == 'python.exe python' else 'OpenSim'
+            path = QFileDialog.getOpenFileName(self, label, field.text(), f'{kind} ({pattern})')[0]
             if path:
                 field.setText(path)
         button.clicked.connect(choose)
@@ -91,6 +94,8 @@ class GaitDynamicsDialog(QDialog):
     def _set_busy(self, busy):
         for field in (self.motion, self.model, self.python):
             field.setEnabled(not busy)
+        for button in self._file_buttons:
+            button.setEnabled(not busy)
         self.check_button.setEnabled(not busy)
         self.close_button.setEnabled(not busy)
         self.convert_button.setEnabled(not busy and all(field.text().strip() for field in (self.motion, self.model, self.python)))

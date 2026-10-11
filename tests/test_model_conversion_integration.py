@@ -52,7 +52,8 @@ class ModelConversionIntegrationTests(unittest.TestCase):
                 if 'axial_rotation' in name:
                     values[name] = -.8*math.sin(i*.03)
             if not degrees:
-                values = {name: value if name.startswith('pelvis_t') and name != 'pelvis_tilt' or name in ('Abs_t1', 'Abs_t2')
+                translations = {'pelvis_tx', 'pelvis_ty', 'pelvis_tz', 'Abs_t1', 'Abs_t2'}
+                values = {name: value if name in translations
                           else value*math.pi/180 for name, value in values.items()}
             rows.append([i*.01 + (.05 if gap and i > 60 else 0)] + [values[name] for name in names])
         self.motion.write_text(f'nRows=160\nnColumns={len(names)+1}\ninDegrees={"yes" if degrees else "no"}\nendheader\n' +
@@ -117,6 +118,10 @@ class ModelConversionIntegrationTests(unittest.TestCase):
         dialog.show()
         output = self.root / 'interface-conversion'
         dialog._start_conversion(output)
+        self.assertFalse(dialog.check_button.isEnabled())
+        self.assertTrue(all(not button.isEnabled() for button in dialog._file_buttons))
+        dialog.close()
+        self.assertTrue(dialog.isVisible(), 'Een lopende conversie moet bij sluiten blijven bestaan.')
         deadline = time.monotonic() + 30
         while dialog.process.state() != QProcess.ProcessState.NotRunning and time.monotonic() < deadline:
             app.processEvents()

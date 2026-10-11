@@ -276,6 +276,7 @@ def convert_model(motion: Path, model_path: Path, output: Path) -> dict:
         # Normalize through OpenSim for parsers using the current model format.
         target.printToXML(str(target_path))
         target_rows, positions, orientations, trunk_errors = [], [], [], []
+        previous_lumbar = None
         lower_errors, orientation_errors = [], []
         for row, values in zip(rows, source_values):
             _set_state(source, state, values)
@@ -284,6 +285,9 @@ def convert_model(motion: Path, model_path: Path, output: Path) -> dict:
             lumbar = Rotation.from_matrix(sr.T @ tr @ child_rotation).as_euler('ZXY')
             if abs(np.cos(lumbar[1])) < 1e-4:
                 raise GaitDynamicsError('Rompstand ligt te dicht bij een Euler-singulariteit.')
+            if previous_lumbar is not None:
+                lumbar = previous_lumbar + (lumbar - previous_lumbar + np.pi) % (2 * np.pi) - np.pi
+            previous_lumbar = lumbar.copy()
             reduced = {name: values[name] for name in COORDINATES[:20]}
             reduced.update(zip(COORDINATES[20:], lumbar))
             _set_state(target, target_state, reduced)
