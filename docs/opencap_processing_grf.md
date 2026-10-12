@@ -96,6 +96,8 @@ Vervolgonderzoek: [aansluitingsproef met echte marker-augmenter-uitvoer](example
 en [verfijnde controle met voetcontactgeometrie, gezamenlijk COP en zwaartepunt](examples/opencap-grf/refined-contact/README.md).
 Die laatste controle vervangt de markerdriehoek als belangrijkste geometrische
 plausibiliteitscontrole en beoordeelt lage-krachtfasen afzonderlijk.
+Daarop volgt de [controle van contactovergangen, hysterese en lage-krachtfasen](examples/opencap-grf/contact-transitions/README.md),
+met diagnostische faselabels en afzonderlijke venster-/drempelgevoeligheid.
 
 De bestaande gebruikersbestanden `model.osim`, `motion.mot` en
 `ground_reaction_forces.mot` uit de eerdere inverse-dynamicaproef zijn gebruikt.
