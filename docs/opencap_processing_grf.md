@@ -92,6 +92,11 @@ meetnauwkeurigheid.
 
 ## Technische proef met de bestaande HU3D-route — 12 oktober 2026
 
+Vervolgonderzoek: [aansluitingsproef met echte marker-augmenter-uitvoer](examples/opencap-grf/cloud-connection/README.md)
+en [verfijnde controle met voetcontactgeometrie, gezamenlijk COP en zwaartepunt](examples/opencap-grf/refined-contact/README.md).
+Die laatste controle vervangt de markerdriehoek als belangrijkste geometrische
+plausibiliteitscontrole en beoordeelt lage-krachtfasen afzonderlijk.
+
 De bestaande gebruikersbestanden `model.osim`, `motion.mot` en
 `ground_reaction_forces.mot` uit de eerdere inverse-dynamicaproef zijn gebruikt.
 De beweging is een **evenwichtsoefening**, geen loopproef. Dit onderzoek test
